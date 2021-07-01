@@ -1,13 +1,10 @@
 version: "3"
 
-includes:
-  dist: ./DistTasks.yml
-
 tasks:
   build:
     desc: Build the project
     cmds:
-      - go build -v {{.LDFLAGS}}
+      - go build -v -ldflags '{{.LDFLAGS}}'
 
 vars:
   PROJECT_NAME: "dummy-discovery"
@@ -17,8 +14,5 @@ vars:
   TIMESTAMP:
     sh: echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   LDFLAGS: >
-    -ldflags
-    '
     -X github.com/arduino/dummy-discovery/version.Tag={{.VERSION}}
     -X github.com/arduino/dummy-discovery/version.Timestamp={{.TIMESTAMP}}
-    '
