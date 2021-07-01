@@ -7,10 +7,10 @@ tasks:
   build:
     desc: Build the project
     cmds:
-      - xgo build -v {{.LDFLAGS}}
+      - go build -v {{.LDFLAGS}}
 
 vars:
-  PROJECT_NAME: "serial-discovery"
+  PROJECT_NAME: "dummy-discovery"
   DIST_DIR: "dist"
   VERSION:
     sh: echo "$(git describe --tags --dirty --broken)"
@@ -19,6 +19,6 @@ vars:
   LDFLAGS: >
     -ldflags
     '
-    -X github.com/arduino/serial-discovery/version.Tag={{.VERSION}}
-    -X github.com/arduino/serial-discovery/version.Timestamp={{.TIMESTAMP}}
+    -X github.com/arduino/dummy-discovery/version.Tag={{.VERSION}}
+    -X github.com/arduino/dummy-discovery/version.Timestamp={{.TIMESTAMP}}
     '
