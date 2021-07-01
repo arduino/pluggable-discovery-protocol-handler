@@ -339,7 +339,7 @@ func CreateDummyPort() *boardPortJSON {
 		Properties: properties.NewFromHashmap(map[string]string{
 			"vid": "0x2341",
 			"pid": "0x0041",
-			"mac": fmt.Sprintf("%d", dummyCounter*73622384782),
+			"mac": fmt.Sprintf("%d", dummyCounter*384782),
 		}),
 	}
 }
