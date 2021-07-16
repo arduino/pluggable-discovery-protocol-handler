@@ -15,10 +15,29 @@
 // a commercial license, send an email to license@arduino.cc.
 //
 
-package version
+package args
+
+import (
+	"fmt"
+	"os"
+)
 
 // Tag is the current git tag
 var Tag = "snapshot"
 
 // Timestamp is the current timestamp
 var Timestamp = "unknown"
+
+func ParseArgs() {
+	for _, arg := range os.Args[1:] {
+		if arg == "" {
+			continue
+		}
+		if arg == "-v" || arg == "--version" {
+			fmt.Printf("serial-discovery %s (build timestamp: %s)\n", Tag, Timestamp)
+			os.Exit(0)
+		}
+		fmt.Fprintf(os.Stderr, "invalid argument: %s\n", arg)
+		os.Exit(1)
+	}
+}
