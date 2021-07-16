@@ -15,6 +15,15 @@
 // a commercial license, send an email to license@arduino.cc.
 //
 
+// discovery is a library for handling the Arduino Pluggable-Discovery protocol
+// (https://github.com/arduino/tooling-rfcs/blob/main/RFCs/0002-pluggable-discovery.md#pluggable-discovery-api-via-stdinstdout)
+//
+// The library implements the state machine and the parsing logic to communicate with a pluggable-discovery client.
+// All the commands issued by the client are conveniently translated into function calls, in particular
+// the Discovery interface are the only functions that must be implemented to get a fully working pluggable discovery
+// using this library.
+//
+// A usage example is provided in the dummy-discovery package.
 package discovery
 
 import (
@@ -30,6 +39,7 @@ import (
 	"github.com/arduino/go-properties-orderedmap"
 )
 
+// Port is a descriptor for a board port
 type Port struct {
 	Address       string          `json:"address"`
 	AddressLabel  string          `json:"label,omitempty"`
@@ -38,16 +48,39 @@ type Port struct {
 	Properties    *properties.Map `json:"properties,omitempty"`
 }
 
-type EventCallback func(event string, port *Port)
-
+// Discovery is an interface that represents the business logic that
+// a pluggable discovery must implement. The communication protocol
+// is completely hidden and it's handled by a DiscoveryServer.
 type Discovery interface {
+	// Hello is called once at startup to provide the userAgent string
+	// and the protocolVersion negotiated with the client.
 	Hello(userAgent string, protocolVersion int) error
+
+	// Start is called to start the discovery internal subroutines.
 	Start() error
-	Stop() error
-	List() ([]*Port, error)
+
+	// List returns the list of the currently available ports. It works
+	// only after a Start.
+	List() (portList []*Port, err error)
+
+	// StartSync is called to put the discovery in event mode. When the
+	// function returns the discovery must send port events ("add" or "remove")
+	// using the eventCB function.
 	StartSync(eventCB EventCallback) (chan<- bool, error)
+
+	// Stop stops the discovery internal subroutines. If the discovery is
+	// in event mode it must stop sending events through the eventCB previously
+	// set.
+	Stop() error
 }
 
+// EventCallback is a callback function to call to transmit port
+// metadata when the discovery is in "sync" mode and a new event
+// is detected.
+type EventCallback func(event string, port *Port)
+
+// A DiscoveryServer is a pluggable discovery protocol handler,
+// it must be created using the NewDiscoveryServer function.
 type DiscoveryServer struct {
 	impl               Discovery
 	out                io.Writer
@@ -60,12 +93,20 @@ type DiscoveryServer struct {
 	syncCloseChan      chan<- bool
 }
 
+// NewDiscoveryServer creates a new discovery server backed by the
+// provided pluggable discovery implementation. To start the server
+// use the Run method.
 func NewDiscoveryServer(impl Discovery) *DiscoveryServer {
 	return &DiscoveryServer{
 		impl: impl,
 	}
 }
 
+// Run starts the protocol handling loop on the given input and
+// output stream, usually `os.Stdin` and `os.Stdout` are used.
+// The function blocks until the `QUIT` command is received or
+// the input stream is closed. In case of IO error the error is
+// returned.
 func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 	d.out = out
 	reader := bufio.NewReader(in)
