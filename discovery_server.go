@@ -311,7 +311,7 @@ func (d *DiscoveryServer) output(msg interface{}) {
 		})
 	} else {
 		d.outMutex.Lock()
-		fmt.Println(string(data))
+		d.out.Write(data)
 		d.outMutex.Unlock()
 	}
 }
