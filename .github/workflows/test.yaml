@@ -26,4 +26,4 @@ jobs:
           go-version: "1.16"
 
       - name: Build
-        run: task build
+        run: task build-dummy-discovery

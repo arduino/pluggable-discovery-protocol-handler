@@ -1,10 +1,10 @@
 version: "3"
 
 tasks:
-  build:
+  build-dummy-discovery:
     desc: Build the dummy-discovery client example
     cmds:
-      - go build -o dist/dummy -v -ldflags '{{.LDFLAGS}}' ./dummy-discovery
+      - go build -o dist/dummy-discovery -v -ldflags '{{.LDFLAGS}}' ./dummy-discovery
 
 vars:
   PROJECT_NAME: "dummy-discovery"
