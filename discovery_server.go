@@ -66,7 +66,7 @@ type Discovery interface {
 	// StartSync is called to put the discovery in event mode. When the
 	// function returns the discovery must send port events ("add" or "remove")
 	// using the eventCB function.
-	StartSync(eventCB EventCallback) (chan<- bool, error)
+	StartSync(eventCB EventCallback) error
 
 	// Stop stops the discovery internal subroutines. If the discovery is
 	// in event mode it must stop sending events through the eventCB previously
@@ -90,7 +90,6 @@ type DiscoveryServer struct {
 	initialized        bool
 	started            bool
 	syncStarted        bool
-	syncCloseChan      chan<- bool
 }
 
 // NewDiscoveryServer creates a new discovery server backed by the
@@ -224,14 +223,12 @@ func (d *DiscoveryServer) startSync() {
 		d.outputError("start_sync", "Discovery already STARTed, cannot START_SYNC")
 		return
 	}
-	if c, err := d.impl.StartSync(d.syncEvent); err != nil {
+	if err := d.impl.StartSync(d.syncEvent); err != nil {
 		d.outputError("start_sync", "Cannot START_SYNC: "+err.Error())
 		return
-	} else {
-		d.syncCloseChan = c
-		d.syncStarted = true
-		d.outputOk("start_sync")
 	}
+	d.syncStarted = true
+	d.outputOk("start_sync")
 }
 
 func (d *DiscoveryServer) stop() {
@@ -243,14 +240,8 @@ func (d *DiscoveryServer) stop() {
 		d.outputError("stop", "Cannot STOP: "+err.Error())
 		return
 	}
-	if d.started {
-		d.started = false
-	}
-	if d.syncStarted {
-		d.syncCloseChan <- true
-		close(d.syncCloseChan)
-		d.syncStarted = false
-	}
+	d.started = false
+	d.syncStarted = false
 	d.outputOk("stop")
 }
 

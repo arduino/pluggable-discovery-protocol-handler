@@ -31,6 +31,7 @@ import (
 type DummyDiscovery struct {
 	startSyncCount int
 	listCount      int
+	closeChan      chan<- bool
 }
 
 func main() {
@@ -61,16 +62,21 @@ func (d *DummyDiscovery) Start() error {
 }
 
 func (d *DummyDiscovery) Stop() error {
+	if d.closeChan != nil {
+		d.closeChan <- true
+		d.closeChan = nil
+	}
 	return nil
 }
 
-func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback) (chan<- bool, error) {
+func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback) error {
 	d.startSyncCount++
 	if d.startSyncCount%5 == 0 {
-		return nil, errors.New("could not start_sync every 5 times")
+		return errors.New("could not start_sync every 5 times")
 	}
 
 	c := make(chan bool)
+	d.closeChan = c
 
 	// Run synchronous event emitter
 	go func() {
@@ -113,7 +119,7 @@ func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback) (chan<- bool
 		}
 	}()
 
-	return c, nil
+	return nil
 }
 
 var dummyCounter = 0
