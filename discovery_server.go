@@ -288,7 +288,7 @@ func (d *DiscoveryServer) output(msg interface{}) {
 		})
 	} else {
 		d.outMutex.Lock()
-		d.out.Write(data)
+		fmt.Fprintln(d.out, string(data))
 		d.outMutex.Unlock()
 	}
 }
