@@ -85,118 +85,132 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 
 		switch cmd {
 		case "HELLO":
-			if d.initialized {
-				d.outputError("hello", "HELLO already called")
-				continue
-			}
-			re := regexp.MustCompile(`(\d+) "([^"]+)"`)
-			matches := re.FindStringSubmatch(fullCmd[6:])
-			if len(matches) != 3 {
-				d.outputError("hello", "Invalid HELLO command")
-				continue
-			}
-			d.userAgent = matches[2]
-			if v, err := strconv.ParseInt(matches[1], 10, 64); err != nil {
-				d.outputError("hello", "Invalid protocol version: "+matches[2])
-				continue
-			} else {
-				d.reqProtocolVersion = int(v)
-			}
-			if err := d.impl.Hello(d.userAgent, 1); err != nil {
-				d.outputError("hello", err.Error())
-				continue
-			}
-			d.output(&genericMessageJSON{
-				EventType:       "hello",
-				ProtocolVersion: 1, // Protocol version 1 is the only supported for now...
-				Message:         "OK",
-			})
-			d.initialized = true
-
+			d.hello(fullCmd[6:])
 		case "START":
-			if d.started {
-				d.outputError("start", "Discovery already STARTed")
-				continue
-			}
-			if d.syncStarted {
-				d.outputError("start", "Discovery already START_SYNCed, cannot START")
-				continue
-			}
-			if err := d.impl.Start(); err != nil {
-				d.outputError("start", "Cannot START: "+err.Error())
-				continue
-			}
-			d.started = true
-			d.outputOk("start")
-
+			d.start()
 		case "LIST":
-			if !d.started {
-				d.outputError("list", "Discovery not STARTed")
-				continue
-			}
-			if d.syncStarted {
-				d.outputError("list", "discovery already START_SYNCed, LIST not allowed")
-				continue
-			}
-			if ports, err := d.impl.List(); err != nil {
-				d.outputError("list", "LIST error: "+err.Error())
-				continue
-			} else {
-				type listOutputJSON struct {
-					EventType string  `json:"eventType"`
-					Ports     []*Port `json:"ports"`
-				}
-				d.output(&listOutputJSON{
-					EventType: "list",
-					Ports:     ports,
-				})
-			}
-
+			d.list()
 		case "START_SYNC":
-			if d.syncStarted {
-				d.outputError("start_sync", "Discovery already START_SYNCed")
-				continue
-			}
-			if d.started {
-				d.outputError("start_sync", "Discovery already STARTed, cannot START_SYNC")
-				continue
-			}
-			if c, err := d.impl.StartSync(d.syncEvent); err != nil {
-				d.outputError("start_sync", "Cannot START_SYNC: "+err.Error())
-				continue
-			} else {
-				d.syncCloseChan = c
-				d.syncStarted = true
-				d.outputOk("start_sync")
-			}
-
+			d.startSync()
 		case "STOP":
-			if !d.syncStarted && !d.started {
-				d.outputError("stop", "Discovery already STOPped")
-				continue
-			}
-			if err := d.impl.Stop(); err != nil {
-				d.outputError("stop", "Cannot STOP: "+err.Error())
-				continue
-			}
-			if d.started {
-				d.started = false
-			}
-			if d.syncStarted {
-				d.syncCloseChan <- true
-				close(d.syncCloseChan)
-				d.syncStarted = false
-			}
-			d.outputOk("stop")
-
+			d.stop()
 		case "QUIT":
 			d.outputOk("quit")
 			return nil
-
 		default:
 			d.outputError("command_error", fmt.Sprintf("Command %s not supported", cmd))
 		}
 	}
+}
+
+func (d *DiscoveryServer) hello(cmd string) {
+	if d.initialized {
+		d.outputError("hello", "HELLO already called")
+		return
+	}
+	re := regexp.MustCompile(`(\d+) "([^"]+)"`)
+	matches := re.FindStringSubmatch(cmd)
+	if len(matches) != 3 {
+		d.outputError("hello", "Invalid HELLO command")
+		return
+	}
+	d.userAgent = matches[2]
+	if v, err := strconv.ParseInt(matches[1], 10, 64); err != nil {
+		d.outputError("hello", "Invalid protocol version: "+matches[2])
+		return
+	} else {
+		d.reqProtocolVersion = int(v)
+	}
+	if err := d.impl.Hello(d.userAgent, 1); err != nil {
+		d.outputError("hello", err.Error())
+		return
+	}
+	d.output(&genericMessageJSON{
+		EventType:       "hello",
+		ProtocolVersion: 1, // Protocol version 1 is the only supported for now...
+		Message:         "OK",
+	})
+	d.initialized = true
+}
+
+func (d *DiscoveryServer) start() {
+	if d.started {
+		d.outputError("start", "Discovery already STARTed")
+		return
+	}
+	if d.syncStarted {
+		d.outputError("start", "Discovery already START_SYNCed, cannot START")
+		return
+	}
+	if err := d.impl.Start(); err != nil {
+		d.outputError("start", "Cannot START: "+err.Error())
+		return
+	}
+	d.started = true
+	d.outputOk("start")
+}
+
+func (d *DiscoveryServer) list() {
+	if !d.started {
+		d.outputError("list", "Discovery not STARTed")
+		return
+	}
+	if d.syncStarted {
+		d.outputError("list", "discovery already START_SYNCed, LIST not allowed")
+		return
+	}
+	if ports, err := d.impl.List(); err != nil {
+		d.outputError("list", "LIST error: "+err.Error())
+		return
+	} else {
+		type listOutputJSON struct {
+			EventType string  `json:"eventType"`
+			Ports     []*Port `json:"ports"`
+		}
+		d.output(&listOutputJSON{
+			EventType: "list",
+			Ports:     ports,
+		})
+	}
+}
+
+func (d *DiscoveryServer) startSync() {
+	if d.syncStarted {
+		d.outputError("start_sync", "Discovery already START_SYNCed")
+		return
+	}
+	if d.started {
+		d.outputError("start_sync", "Discovery already STARTed, cannot START_SYNC")
+		return
+	}
+	if c, err := d.impl.StartSync(d.syncEvent); err != nil {
+		d.outputError("start_sync", "Cannot START_SYNC: "+err.Error())
+		return
+	} else {
+		d.syncCloseChan = c
+		d.syncStarted = true
+		d.outputOk("start_sync")
+	}
+}
+
+func (d *DiscoveryServer) stop() {
+	if !d.syncStarted && !d.started {
+		d.outputError("stop", "Discovery already STOPped")
+		return
+	}
+	if err := d.impl.Stop(); err != nil {
+		d.outputError("stop", "Cannot STOP: "+err.Error())
+		return
+	}
+	if d.started {
+		d.started = false
+	}
+	if d.syncStarted {
+		d.syncCloseChan <- true
+		close(d.syncCloseChan)
+		d.syncStarted = false
+	}
+	d.outputOk("stop")
 }
 
 func (d *DiscoveryServer) syncEvent(event string, port *Port) {
