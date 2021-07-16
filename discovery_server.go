@@ -72,62 +72,38 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 	for {
 		fullCmd, err := reader.ReadString('\n')
 		if err != nil {
-			d.output(&genericMessageJSON{
-				EventType: "command_error",
-				Error:     true,
-				Message:   err.Error(),
-			})
+			d.outputError("command_error", err.Error())
 			return err
 		}
 		split := strings.Split(fullCmd, " ")
 		cmd := strings.ToUpper(strings.TrimSpace(split[0]))
 
 		if !d.initialized && cmd != "HELLO" {
-			d.output(&genericMessageJSON{
-				EventType: "command_error",
-				Error:     true,
-				Message:   fmt.Sprintf("First command must be HELLO, but got '%s'", cmd),
-			})
+			d.outputError("command_error", fmt.Sprintf("First command must be HELLO, but got '%s'", cmd))
 			continue
 		}
 
 		switch cmd {
 		case "HELLO":
 			if d.initialized {
-				d.output(&genericMessageJSON{
-					EventType: "hello",
-					Error:     true,
-					Message:   "HELLO already called",
-				})
+				d.outputError("hello", "HELLO already called")
 				continue
 			}
 			re := regexp.MustCompile(`(\d+) "([^"]+)"`)
 			matches := re.FindStringSubmatch(fullCmd[6:])
 			if len(matches) != 3 {
-				d.output(&genericMessageJSON{
-					EventType: "hello",
-					Error:     true,
-					Message:   "Invalid HELLO command",
-				})
+				d.outputError("hello", "Invalid HELLO command")
 				continue
 			}
 			d.userAgent = matches[2]
 			if v, err := strconv.ParseInt(matches[1], 10, 64); err != nil {
-				d.output(&genericMessageJSON{
-					EventType: "hello",
-					Error:     true,
-					Message:   "Invalid protocol version: " + matches[2],
-				})
+				d.outputError("hello", "Invalid protocol version: "+matches[2])
 				continue
 			} else {
 				d.reqProtocolVersion = int(v)
 			}
 			if err := d.impl.Hello(d.userAgent, 1); err != nil {
-				d.output(&genericMessageJSON{
-					EventType: "hello",
-					Error:     true,
-					Message:   err.Error(),
-				})
+				d.outputError("hello", err.Error())
 				continue
 			}
 			d.output(&genericMessageJSON{
@@ -139,58 +115,31 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 
 		case "START":
 			if d.started {
-				d.output(&genericMessageJSON{
-					EventType: "start",
-					Error:     true,
-					Message:   "Discovery already STARTed",
-				})
+				d.outputError("start", "Discovery already STARTed")
 				continue
 			}
 			if d.syncStarted {
-				d.output(&genericMessageJSON{
-					EventType: "start",
-					Error:     true,
-					Message:   "Discovery already START_SYNCed, cannot START",
-				})
+				d.outputError("start", "Discovery already START_SYNCed, cannot START")
 				continue
 			}
 			if err := d.impl.Start(); err != nil {
-				d.output(&genericMessageJSON{
-					EventType: "start",
-					Error:     true,
-					Message:   "Cannot START: " + err.Error(),
-				})
+				d.outputError("start", "Cannot START: "+err.Error())
 				continue
 			}
 			d.started = true
-			d.output(&genericMessageJSON{
-				EventType: "start",
-				Message:   "OK",
-			})
+			d.outputOk("start")
 
 		case "LIST":
 			if !d.started {
-				d.output(&genericMessageJSON{
-					EventType: "list",
-					Error:     true,
-					Message:   "Discovery not STARTed",
-				})
+				d.outputError("list", "Discovery not STARTed")
 				continue
 			}
 			if d.syncStarted {
-				d.output(&genericMessageJSON{
-					EventType: "list",
-					Error:     true,
-					Message:   "discovery already START_SYNCed, LIST not allowed",
-				})
+				d.outputError("list", "discovery already START_SYNCed, LIST not allowed")
 				continue
 			}
 			if ports, err := d.impl.List(); err != nil {
-				d.output(&genericMessageJSON{
-					EventType: "list",
-					Error:     true,
-					Message:   "LIST error: " + err.Error(),
-				})
+				d.outputError("list", "LIST error: "+err.Error())
 				continue
 			} else {
 				type listOutputJSON struct {
@@ -205,52 +154,29 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 
 		case "START_SYNC":
 			if d.syncStarted {
-				d.output(&genericMessageJSON{
-					EventType: "start_sync",
-					Error:     true,
-					Message:   "Discovery already START_SYNCed",
-				})
+				d.outputError("start_sync", "Discovery already START_SYNCed")
 				continue
 			}
 			if d.started {
-				d.output(&genericMessageJSON{
-					EventType: "start_sync",
-					Error:     true,
-					Message:   "Discovery already STARTed, cannot START_SYNC",
-				})
+				d.outputError("start_sync", "Discovery already STARTed, cannot START_SYNC")
 				continue
 			}
 			if c, err := d.impl.StartSync(d.syncEvent); err != nil {
-				d.output(&genericMessageJSON{
-					EventType: "start_sync",
-					Error:     true,
-					Message:   "Cannot START_SYNC: " + err.Error(),
-				})
+				d.outputError("start_sync", "Cannot START_SYNC: "+err.Error())
 				continue
 			} else {
 				d.syncCloseChan = c
 				d.syncStarted = true
-				d.output(&genericMessageJSON{
-					EventType: "start_sync",
-					Message:   "OK",
-				})
+				d.outputOk("start_sync")
 			}
 
 		case "STOP":
 			if !d.syncStarted && !d.started {
-				d.output(&genericMessageJSON{
-					EventType: "stop",
-					Error:     true,
-					Message:   "Discovery already STOPped",
-				})
+				d.outputError("stop", "Discovery already STOPped")
 				continue
 			}
 			if err := d.impl.Stop(); err != nil {
-				d.output(&genericMessageJSON{
-					EventType: "stop",
-					Error:     true,
-					Message:   "Cannot STOP: " + err.Error(),
-				})
+				d.outputError("stop", "Cannot STOP: "+err.Error())
 				continue
 			}
 			if d.started {
@@ -261,24 +187,14 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 				close(d.syncCloseChan)
 				d.syncStarted = false
 			}
-			d.output(&genericMessageJSON{
-				EventType: "stop",
-				Message:   "OK",
-			})
+			d.outputOk("stop")
 
 		case "QUIT":
-			d.output(&genericMessageJSON{
-				EventType: "quit",
-				Message:   "OK",
-			})
+			d.outputOk("quit")
 			return nil
 
 		default:
-			d.output(&genericMessageJSON{
-				EventType: "command_error",
-				Error:     true,
-				Message:   fmt.Sprintf("Command %s not supported", cmd),
-			})
+			d.outputError("command_error", fmt.Sprintf("Command %s not supported", cmd))
 		}
 	}
 }
@@ -299,6 +215,21 @@ type genericMessageJSON struct {
 	Message         string `json:"message"`
 	Error           bool   `json:"error,omitempty"`
 	ProtocolVersion int    `json:"protocolVersion,omitempty"`
+}
+
+func (d *DiscoveryServer) outputOk(event string) {
+	d.output(&genericMessageJSON{
+		EventType: event,
+		Message:   "OK",
+	})
+}
+
+func (d *DiscoveryServer) outputError(event, msg string) {
+	d.output(&genericMessageJSON{
+		EventType: event,
+		Error:     true,
+		Message:   msg,
+	})
 }
 
 func (d *DiscoveryServer) output(msg interface{}) {
