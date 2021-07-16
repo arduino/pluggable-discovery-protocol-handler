@@ -88,15 +88,6 @@ func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback) error {
 
 		// Start sending events
 		for {
-			// if err != nil {
-			// 	output(&genericMessageJSON{
-			// 		EventType: "start_sync",
-			// 		Error:     true,
-			// 		Message:   fmt.Sprintf("error decoding START_SYNC event: %s", err),
-			// 	})
-			// 	return
-			// }
-
 			select {
 			case <-closeChan:
 				return
