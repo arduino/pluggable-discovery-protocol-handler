@@ -71,7 +71,7 @@ func (d *DummyDiscovery) Stop() error {
 	return nil
 }
 
-func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback) error {
+func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback, errorCB discovery.ErrorCallback) error {
 	d.startSyncCount++
 	if d.startSyncCount%5 == 0 {
 		return errors.New("could not start_sync every 5 times")
@@ -89,7 +89,10 @@ func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback) error {
 		eventCB("add", CreateDummyPort())
 
 		// Start sending events
-		for {
+		count := 0
+		for count < 2 {
+			count++
+
 			select {
 			case <-closeChan:
 				return
@@ -110,6 +113,9 @@ func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback) error {
 				Protocol: port.Protocol,
 			})
 		}
+
+		errorCB("unrecoverable error, cannot send more events")
+		<-closeChan
 	}()
 
 	return nil

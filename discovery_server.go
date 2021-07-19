@@ -66,7 +66,7 @@ type Discovery interface {
 	// StartSync is called to put the discovery in event mode. When the
 	// function returns the discovery must send port events ("add" or "remove")
 	// using the eventCB function.
-	StartSync(eventCB EventCallback) error
+	StartSync(eventCB EventCallback, errorCB ErrorCallback) error
 
 	// Stop stops the discovery internal subroutines. If the discovery is
 	// in event mode it must stop sending events through the eventCB previously
@@ -82,6 +82,12 @@ type Discovery interface {
 // metadata when the discovery is in "sync" mode and a new event
 // is detected.
 type EventCallback func(event string, port *Port)
+
+// ErrorCallback is a callback function to signal unrecoverable errors to the
+// client while the discovery is in event mode. Once the discovery signal an
+// error it means that no more port-events will be delivered until the client
+// performs a STOP+START_SYNC cycle.
+type ErrorCallback func(err string)
 
 // A DiscoveryServer is a pluggable discovery protocol handler,
 // it must be created using the NewDiscoveryServer function.
@@ -233,7 +239,7 @@ func (d *DiscoveryServer) startSync() {
 	}
 	c := make(chan interface{}, 10) // buffer up to 10 events
 	d.syncChannel = c
-	if err := d.impl.StartSync(d.syncEvent); err != nil {
+	if err := d.impl.StartSync(d.syncEvent, d.errorEvent); err != nil {
 		d.outputError("start_sync", "Cannot START_SYNC: "+err.Error())
 		close(d.syncChannel) // do not leak channel...
 		d.syncChannel = nil
@@ -275,6 +281,19 @@ func (d *DiscoveryServer) syncEvent(event string, port *Port) {
 	d.syncChannel <- &syncOutputJSON{
 		EventType: event,
 		Port:      port,
+	}
+}
+
+func (d *DiscoveryServer) errorEvent(msg string) {
+	type syncOutputJSON struct {
+		EventType string `json:"eventType"`
+		Error     bool   `json:"error"`
+		Message   string `json:"message"`
+	}
+	d.syncChannel <- &syncOutputJSON{
+		EventType: "start_sync",
+		Error:     true,
+		Message:   msg,
 	}
 }
 
