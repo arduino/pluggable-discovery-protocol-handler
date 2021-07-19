@@ -155,7 +155,7 @@ func (d *DiscoveryServer) hello(cmd string) {
 		d.outputError("hello", "HELLO already called")
 		return
 	}
-	re := regexp.MustCompile(`(\d+) "([^"]+)"`)
+	re := regexp.MustCompile(`(\d+) "([^"]+)"$`)
 	matches := re.FindStringSubmatch(cmd)
 	if len(matches) != 3 {
 		d.outputError("hello", "Invalid HELLO command")
