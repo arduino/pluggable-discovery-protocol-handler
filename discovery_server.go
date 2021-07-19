@@ -94,6 +94,7 @@ type DiscoveryServer struct {
 	initialized        bool
 	started            bool
 	syncStarted        bool
+	syncChannel        chan interface{}
 }
 
 // NewDiscoveryServer creates a new discovery server backed by the
@@ -228,12 +229,22 @@ func (d *DiscoveryServer) startSync() {
 		d.outputError("start_sync", "Discovery already STARTed, cannot START_SYNC")
 		return
 	}
+	d.syncChannel = make(chan interface{}, 10) // buffer up to 10 events
 	if err := d.impl.StartSync(d.syncEvent); err != nil {
 		d.outputError("start_sync", "Cannot START_SYNC: "+err.Error())
+		close(d.syncChannel) // do not leak channel...
+		d.syncChannel = nil
 		return
 	}
 	d.syncStarted = true
 	d.outputOk("start_sync")
+	go d.consumeEvents(d.syncChannel)
+}
+
+func (d *DiscoveryServer) consumeEvents(c <-chan interface{}) {
+	for e := range c {
+		d.output(e)
+	}
 }
 
 func (d *DiscoveryServer) stop() {
@@ -246,7 +257,11 @@ func (d *DiscoveryServer) stop() {
 		return
 	}
 	d.started = false
-	d.syncStarted = false
+	if d.syncStarted {
+		close(d.syncChannel)
+		d.syncChannel = nil
+		d.syncStarted = false
+	}
 	d.outputOk("stop")
 }
 
@@ -255,10 +270,10 @@ func (d *DiscoveryServer) syncEvent(event string, port *Port) {
 		EventType string `json:"eventType"`
 		Port      *Port  `json:"port"`
 	}
-	d.output(&syncOutputJSON{
+	d.syncChannel <- &syncOutputJSON{
 		EventType: event,
 		Port:      port,
-	})
+	}
 }
 
 type genericMessageJSON struct {
