@@ -206,19 +206,20 @@ func (d *DiscoveryServer) list() {
 		d.outputError("list", "discovery already START_SYNCed, LIST not allowed")
 		return
 	}
-	if ports, err := d.impl.List(); err != nil {
+	ports, err := d.impl.List()
+	if err != nil {
 		d.outputError("list", "LIST error: "+err.Error())
 		return
-	} else {
-		type listOutputJSON struct {
-			EventType string  `json:"eventType"`
-			Ports     []*Port `json:"ports"`
-		}
-		d.output(&listOutputJSON{
-			EventType: "list",
-			Ports:     ports,
-		})
 	}
+
+	type listOutputJSON struct {
+		EventType string  `json:"eventType"`
+		Ports     []*Port `json:"ports"`
+	}
+	d.output(&listOutputJSON{
+		EventType: "list",
+		Ports:     ports,
+	})
 }
 
 func (d *DiscoveryServer) startSync() {
