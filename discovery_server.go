@@ -120,8 +120,9 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 			d.outputError("command_error", err.Error())
 			return err
 		}
+		fullCmd = strings.TrimSpace(fullCmd)
 		split := strings.Split(fullCmd, " ")
-		cmd := strings.ToUpper(strings.TrimSpace(split[0]))
+		cmd := strings.ToUpper(split[0])
 
 		if !d.initialized && cmd != "HELLO" {
 			d.outputError("command_error", fmt.Sprintf("First command must be HELLO, but got '%s'", cmd))
