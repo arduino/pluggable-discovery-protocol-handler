@@ -124,7 +124,7 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 		split := strings.Split(fullCmd, " ")
 		cmd := strings.ToUpper(split[0])
 
-		if !d.initialized && cmd != "HELLO" {
+		if !d.initialized && cmd != "HELLO" && cmd != "QUIT" {
 			d.outputError("command_error", fmt.Sprintf("First command must be HELLO, but got '%s'", cmd))
 			continue
 		}
