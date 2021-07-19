@@ -1,4 +1,4 @@
-module github.com/arduino/dummy-discovery
+module github.com/arduino/pluggable-discovery-protocol-handler
 
 go 1.16
 
