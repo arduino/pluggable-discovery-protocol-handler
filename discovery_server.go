@@ -72,6 +72,10 @@ type Discovery interface {
 	// in event mode it must stop sending events through the eventCB previously
 	// set.
 	Stop() error
+
+	// Quit is called just before the server terminates. This function can be
+	// used by the discovery as a last chance gracefully close resources.
+	Quit()
 }
 
 // EventCallback is a callback function to call to transmit port
@@ -135,6 +139,7 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 		case "STOP":
 			d.stop()
 		case "QUIT":
+			d.impl.Quit()
 			d.outputOk("quit")
 			return nil
 		default:

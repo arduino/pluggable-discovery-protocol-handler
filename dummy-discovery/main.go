@@ -47,6 +47,8 @@ func (d *DummyDiscovery) Hello(userAgent string, protocol int) error {
 	return nil
 }
 
+func (d *DummyDiscovery) Quit() {}
+
 func (d *DummyDiscovery) List() ([]*discovery.Port, error) {
 	d.listCount++
 	if d.listCount%5 == 0 {
