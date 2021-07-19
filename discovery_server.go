@@ -231,7 +231,8 @@ func (d *DiscoveryServer) startSync() {
 		d.outputError("start_sync", "Discovery already STARTed, cannot START_SYNC")
 		return
 	}
-	d.syncChannel = make(chan interface{}, 10) // buffer up to 10 events
+	c := make(chan interface{}, 10) // buffer up to 10 events
+	d.syncChannel = c
 	if err := d.impl.StartSync(d.syncEvent); err != nil {
 		d.outputError("start_sync", "Cannot START_SYNC: "+err.Error())
 		close(d.syncChannel) // do not leak channel...
@@ -240,13 +241,12 @@ func (d *DiscoveryServer) startSync() {
 	}
 	d.syncStarted = true
 	d.outputOk("start_sync")
-	go d.consumeEvents(d.syncChannel)
-}
 
-func (d *DiscoveryServer) consumeEvents(c <-chan interface{}) {
-	for e := range c {
-		d.output(e)
-	}
+	go func() {
+		for e := range c {
+			d.output(e)
+		}
+	}()
 }
 
 func (d *DiscoveryServer) stop() {
