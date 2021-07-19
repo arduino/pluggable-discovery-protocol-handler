@@ -34,7 +34,7 @@ func ParseArgs() {
 			continue
 		}
 		if arg == "-v" || arg == "--version" {
-			fmt.Printf("serial-discovery %s (build timestamp: %s)\n", Tag, Timestamp)
+			fmt.Printf("dummy-discovery %s (build timestamp: %s)\n", Tag, Timestamp)
 			os.Exit(0)
 		}
 		fmt.Fprintf(os.Stderr, "invalid argument: %s\n", arg)

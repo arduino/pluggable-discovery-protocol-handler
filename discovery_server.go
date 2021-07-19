@@ -1,5 +1,5 @@
 //
-// This file is part of dummy-discovery.
+// This file is part of pluggable-discovery-protocol-handler.
 //
 // Copyright 2021 ARDUINO SA (http://www.arduino.cc/)
 //

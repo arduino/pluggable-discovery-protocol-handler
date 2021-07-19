@@ -23,9 +23,9 @@ import (
 	"os"
 	"time"
 
-	discovery "github.com/arduino/dummy-discovery"
-	"github.com/arduino/dummy-discovery/dummy-discovery/args"
 	"github.com/arduino/go-properties-orderedmap"
+	discovery "github.com/arduino/pluggable-discovery-protocol-handler"
+	"github.com/arduino/pluggable-discovery-protocol-handler/dummy-discovery/args"
 )
 
 type DummyDiscovery struct {

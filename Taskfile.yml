@@ -14,5 +14,5 @@ vars:
   TIMESTAMP:
     sh: echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   LDFLAGS: >
-    -X github.com/arduino/dummy-discovery/dummy-discovery/args.Tag={{.VERSION}}
-    -X github.com/arduino/dummy-discovery/dummy-discovery/args.Timestamp={{.TIMESTAMP}}
+    -X github.com/arduino/pluggable-discovery-protocol-handler/dummy-discovery/args.Tag={{.VERSION}}
+    -X github.com/arduino/pluggable-discovery-protocol-handler/dummy-discovery/args.Timestamp={{.TIMESTAMP}}
