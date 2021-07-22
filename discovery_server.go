@@ -56,13 +56,6 @@ type Discovery interface {
 	// and the protocolVersion negotiated with the client.
 	Hello(userAgent string, protocolVersion int) error
 
-	// Start is called to start the discovery internal subroutines.
-	Start() error
-
-	// List returns the list of the currently available ports. It works
-	// only after a Start.
-	List() (portList []*Port, err error)
-
 	// StartSync is called to put the discovery in event mode. When the
 	// function returns the discovery must send port events ("add" or "remove")
 	// using the eventCB function.
@@ -101,6 +94,8 @@ type DiscoveryServer struct {
 	started            bool
 	syncStarted        bool
 	syncChannel        chan interface{}
+	cachedPorts        map[string]*Port
+	cachedErr          string
 }
 
 // NewDiscoveryServer creates a new discovery server backed by the
@@ -195,12 +190,28 @@ func (d *DiscoveryServer) start() {
 		d.outputError("start", "Discovery already START_SYNCed, cannot START")
 		return
 	}
-	if err := d.impl.Start(); err != nil {
+	d.cachedPorts = map[string]*Port{}
+	d.cachedErr = ""
+	if err := d.impl.StartSync(d.eventCallback, d.errorCallback); err != nil {
 		d.outputError("start", "Cannot START: "+err.Error())
 		return
 	}
 	d.started = true
 	d.outputOk("start")
+}
+
+func (d *DiscoveryServer) eventCallback(event string, port *Port) {
+	id := port.Address + "|" + port.Protocol
+	if event == "add" {
+		d.cachedPorts[id] = port
+	}
+	if event == "remove" {
+		delete(d.cachedPorts, id)
+	}
+}
+
+func (d *DiscoveryServer) errorCallback(msg string) {
+	d.cachedErr = msg
 }
 
 func (d *DiscoveryServer) list() {
@@ -212,12 +223,14 @@ func (d *DiscoveryServer) list() {
 		d.outputError("list", "discovery already START_SYNCed, LIST not allowed")
 		return
 	}
-	ports, err := d.impl.List()
-	if err != nil {
-		d.outputError("list", "LIST error: "+err.Error())
+	if d.cachedErr != "" {
+		d.outputError("list", d.cachedErr)
 		return
 	}
-
+	ports := []*Port{}
+	for _, port := range d.cachedPorts {
+		ports = append(ports, port)
+	}
 	type listOutputJSON struct {
 		EventType string  `json:"eventType"`
 		Ports     []*Port `json:"ports"`

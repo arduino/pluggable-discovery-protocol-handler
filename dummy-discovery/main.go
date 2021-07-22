@@ -30,7 +30,6 @@ import (
 
 type DummyDiscovery struct {
 	startSyncCount int
-	listCount      int
 	closeChan      chan<- bool
 }
 
@@ -48,20 +47,6 @@ func (d *DummyDiscovery) Hello(userAgent string, protocol int) error {
 }
 
 func (d *DummyDiscovery) Quit() {}
-
-func (d *DummyDiscovery) List() ([]*discovery.Port, error) {
-	d.listCount++
-	if d.listCount%5 == 0 {
-		return nil, errors.New("could not list every 5 times")
-	}
-	return []*discovery.Port{
-		CreateDummyPort(),
-	}, nil
-}
-
-func (d *DummyDiscovery) Start() error {
-	return nil
-}
 
 func (d *DummyDiscovery) Stop() error {
 	if d.closeChan != nil {
