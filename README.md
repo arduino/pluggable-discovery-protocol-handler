@@ -1,11 +1,12 @@
-# A golang library to handle the Arduino pluggable-discovery communication protocol.
+# Pluggable Discovery Protocol Handler
 
-## How to build
+This project is a library to ease implementation of pluggable discoveries for the [Arduino CLI](https://github.com/arduino/arduino-cli)
+following the [official specification](https://arduino.github.io/arduino-cli/latest/platform-specification/#pluggable-discovery).
 
 ## Security
 
 If you think you found a vulnerability or other security-related bug in this project, please read our
-[security policy](https://github.com/arduino/serial-discovery/security/policy) and report the bug to our Security Team 🛡️
+[security policy](https://github.com/arduino/pluggable-discovery-protocol-handler/security/policy) and report the bug to our Security Team 🛡️
 Thank you!
 
 e-mail contact: security@arduino.cc
@@ -18,4 +19,4 @@ The software is released under the GNU General Public License, which covers the 
 of the serial-discovery code. The terms of this license can be found at:
 https://www.gnu.org/licenses/gpl-3.0.en.html
 
-See [LICENSE.txt](https://github.com/arduino/serial-discovery/blob/master/LICENSE.txt) for details.
+See [LICENSE.txt](https://github.com/arduino/pluggable-discovery-protocol-handler/blob/master/LICENSE.txt) for details.
