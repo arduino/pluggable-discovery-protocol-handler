@@ -34,7 +34,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/arduino/go-properties-orderedmap"
 )
@@ -86,14 +85,13 @@ type ErrorCallback func(err string)
 // it must be created using the NewDiscoveryServer function.
 type DiscoveryServer struct {
 	impl               Discovery
-	out                io.Writer
-	outMutex           sync.Mutex
+	outputChan         chan *message
 	userAgent          string
 	reqProtocolVersion int
 	initialized        bool
 	started            bool
 	syncStarted        bool
-	syncChannel        chan interface{}
+	syncChannel        chan *message
 	cachedPorts        map[string]*Port
 	cachedErr          string
 }
@@ -103,7 +101,8 @@ type DiscoveryServer struct {
 // use the Run method.
 func NewDiscoveryServer(impl Discovery) *DiscoveryServer {
 	return &DiscoveryServer{
-		impl: impl,
+		impl:       impl,
+		outputChan: make(chan *message),
 	}
 }
 
@@ -113,12 +112,13 @@ func NewDiscoveryServer(impl Discovery) *DiscoveryServer {
 // the input stream is closed. In case of IO error the error is
 // returned.
 func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
-	d.out = out
+	go d.outputProcessor(out)
+	defer close(d.outputChan)
 	reader := bufio.NewReader(in)
 	for {
 		fullCmd, err := reader.ReadString('\n')
 		if err != nil {
-			d.outputError("command_error", err.Error())
+			d.outputChan <- messageError("command_error", err.Error())
 			return err
 		}
 		fullCmd = strings.TrimSpace(fullCmd)
@@ -126,7 +126,7 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 		cmd := strings.ToUpper(split[0])
 
 		if !d.initialized && cmd != "HELLO" && cmd != "QUIT" {
-			d.outputError("command_error", fmt.Sprintf("First command must be HELLO, but got '%s'", cmd))
+			d.outputChan <- messageError("command_error", fmt.Sprintf("First command must be HELLO, but got '%s'", cmd))
 			continue
 		}
 
@@ -143,61 +143,61 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 			d.stop()
 		case "QUIT":
 			d.impl.Quit()
-			d.outputOk("quit")
+			d.outputChan <- messageOk("quit")
 			return nil
 		default:
-			d.outputError("command_error", fmt.Sprintf("Command %s not supported", cmd))
+			d.outputChan <- messageError("command_error", fmt.Sprintf("Command %s not supported", cmd))
 		}
 	}
 }
 
 func (d *DiscoveryServer) hello(cmd string) {
 	if d.initialized {
-		d.outputError("hello", "HELLO already called")
+		d.outputChan <- messageError("hello", "HELLO already called")
 		return
 	}
 	re := regexp.MustCompile(`^(\d+) "([^"]+)"$`)
 	matches := re.FindStringSubmatch(cmd)
 	if len(matches) != 3 {
-		d.outputError("hello", "Invalid HELLO command")
+		d.outputChan <- messageError("hello", "Invalid HELLO command")
 		return
 	}
 	d.userAgent = matches[2]
 	if v, err := strconv.ParseInt(matches[1], 10, 64); err != nil {
-		d.outputError("hello", "Invalid protocol version: "+matches[2])
+		d.outputChan <- messageError("hello", "Invalid protocol version: "+matches[2])
 		return
 	} else {
 		d.reqProtocolVersion = int(v)
 	}
 	if err := d.impl.Hello(d.userAgent, 1); err != nil {
-		d.outputError("hello", err.Error())
+		d.outputChan <- messageError("hello", err.Error())
 		return
 	}
-	d.output(&genericMessageJSON{
+	d.outputChan <- &message{
 		EventType:       "hello",
 		ProtocolVersion: 1, // Protocol version 1 is the only supported for now...
 		Message:         "OK",
-	})
+	}
 	d.initialized = true
 }
 
 func (d *DiscoveryServer) start() {
 	if d.started {
-		d.outputError("start", "Discovery already STARTed")
+		d.outputChan <- messageError("start", "Discovery already STARTed")
 		return
 	}
 	if d.syncStarted {
-		d.outputError("start", "Discovery already START_SYNCed, cannot START")
+		d.outputChan <- messageError("start", "Discovery already START_SYNCed, cannot START")
 		return
 	}
 	d.cachedPorts = map[string]*Port{}
 	d.cachedErr = ""
 	if err := d.impl.StartSync(d.eventCallback, d.errorCallback); err != nil {
-		d.outputError("start", "Cannot START: "+err.Error())
+		d.outputChan <- messageError("start", "Cannot START: "+err.Error())
 		return
 	}
 	d.started = true
-	d.outputOk("start")
+	d.outputChan <- messageOk("start")
 }
 
 func (d *DiscoveryServer) eventCallback(event string, port *Port) {
@@ -216,65 +216,61 @@ func (d *DiscoveryServer) errorCallback(msg string) {
 
 func (d *DiscoveryServer) list() {
 	if !d.started {
-		d.outputError("list", "Discovery not STARTed")
+		d.outputChan <- messageError("list", "Discovery not STARTed")
 		return
 	}
 	if d.syncStarted {
-		d.outputError("list", "discovery already START_SYNCed, LIST not allowed")
+		d.outputChan <- messageError("list", "discovery already START_SYNCed, LIST not allowed")
 		return
 	}
 	if d.cachedErr != "" {
-		d.outputError("list", d.cachedErr)
+		d.outputChan <- messageError("list", d.cachedErr)
 		return
 	}
 	ports := []*Port{}
 	for _, port := range d.cachedPorts {
 		ports = append(ports, port)
 	}
-	type listOutputJSON struct {
-		EventType string  `json:"eventType"`
-		Ports     []*Port `json:"ports"`
-	}
-	d.output(&listOutputJSON{
+	d.outputChan <- &message{
 		EventType: "list",
-		Ports:     ports,
-	})
+		Ports:     &ports,
+	}
 }
 
 func (d *DiscoveryServer) startSync() {
 	if d.syncStarted {
-		d.outputError("start_sync", "Discovery already START_SYNCed")
+		d.outputChan <- messageError("start_sync", "Discovery already START_SYNCed")
 		return
 	}
 	if d.started {
-		d.outputError("start_sync", "Discovery already STARTed, cannot START_SYNC")
+		d.outputChan <- messageError("start_sync", "Discovery already STARTed, cannot START_SYNC")
 		return
 	}
-	c := make(chan interface{}, 10) // buffer up to 10 events
+	c := make(chan *message, 10) // buffer up to 10 events
 	d.syncChannel = c
 	if err := d.impl.StartSync(d.syncEvent, d.errorEvent); err != nil {
-		d.outputError("start_sync", "Cannot START_SYNC: "+err.Error())
+		d.outputChan <- messageError("start_sync", "Cannot START_SYNC: "+err.Error())
 		close(d.syncChannel) // do not leak channel...
 		d.syncChannel = nil
 		return
 	}
 	d.syncStarted = true
-	d.outputOk("start_sync")
+	d.outputChan <- messageOk("start_sync")
 
 	go func() {
 		for e := range c {
-			d.output(e)
+			d.outputChan <- e
 		}
 	}()
 }
 
 func (d *DiscoveryServer) stop() {
 	if !d.syncStarted && !d.started {
-		d.outputError("stop", "Discovery already STOPped")
+		d.outputChan <- messageError("stop", "Discovery already STOPped")
 		return
 	}
 	if err := d.impl.Stop(); err != nil {
-		d.outputError("stop", "Cannot STOP: "+err.Error())
+		d.outputChan <- messageError("stop", "Cannot STOP: "+err.Error())
 		return
 	}
 	d.started = false
@@ -283,66 +279,31 @@ func (d *DiscoveryServer) stop() {
 		d.syncChannel = nil
 		d.syncStarted = false
 	}
-	d.outputOk("stop")
+	d.outputChan <- messageOk("stop")
 }
 
 func (d *DiscoveryServer) syncEvent(event string, port *Port) {
-	type syncOutputJSON struct {
-		EventType string `json:"eventType"`
-		Port      *Port  `json:"port"`
-	}
-	d.syncChannel <- &syncOutputJSON{
+	d.syncChannel <- &message{
 		EventType: event,
 		Port:      port,
 	}
 }
 
 func (d *DiscoveryServer) errorEvent(msg string) {
-	type syncOutputJSON struct {
-		EventType string `json:"eventType"`
-		Error     bool   `json:"error"`
-		Message   string `json:"message"`
-	}
-	d.syncChannel <- &syncOutputJSON{
-		EventType: "start_sync",
-		Error:     true,
-		Message:   msg,
-	}
+	d.syncChannel <- messageError("start_sync", msg)
 }
 
-type genericMessageJSON struct {
-	EventType       string `json:"eventType"`
-	Message         string `json:"message"`
-	Error           bool   `json:"error,omitempty"`
-	ProtocolVersion int    `json:"protocolVersion,omitempty"`
-}
-
-func (d *DiscoveryServer) outputOk(event string) {
-	d.output(&genericMessageJSON{
-		EventType: event,
-		Message:   "OK",
-	})
-}
-
-func (d *DiscoveryServer) outputError(event, msg string) {
-	d.output(&genericMessageJSON{
-		EventType: event,
-		Error:     true,
-		Message:   msg,
-	})
-}
-
-func (d *DiscoveryServer) output(msg interface{}) {
-	data, err := json.MarshalIndent(msg, "", "  ")
-	if err != nil {
-		d.output(&genericMessageJSON{
-			EventType: "command_error",
-			Error:     true,
-			Message:   err.Error(),
-		})
-	} else {
-		d.outMutex.Lock()
-		fmt.Fprintln(d.out, string(data))
-		d.outMutex.Unlock()
-	}
+func (d *DiscoveryServer) outputProcessor(outWriter io.Writer) {
+	// Start go routine to serialize messages printing
+	go func() {
+		for msg := range d.outputChan {
+			data, err := json.MarshalIndent(msg, "", "  ")
+			if err != nil {
+				// We are certain that this will be marshalled correctly
+				// so we don't handle the error
+				data, _ = json.MarshalIndent(messageError("command_error", err.Error()), "", "  ")
+			}
+			fmt.Fprintln(outWriter, string(data))
+		}
+	}()
 }
