@@ -69,7 +69,7 @@ func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback, errorCB disc
 	go func() {
 		var closeChan <-chan bool = c
 
-		// Ouput initial port state
+		// Output initial port state
 		eventCB("add", CreateDummyPort())
 		eventCB("add", CreateDummyPort())
 
