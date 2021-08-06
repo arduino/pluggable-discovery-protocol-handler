@@ -91,7 +91,6 @@ type DiscoveryServer struct {
 	initialized        bool
 	started            bool
 	syncStarted        bool
-	syncChannel        chan *message
 	cachedPorts        map[string]*Port
 	cachedErr          string
 }
@@ -246,22 +245,12 @@ func (d *DiscoveryServer) startSync() {
 		d.outputChan <- messageError("start_sync", "Discovery already STARTed, cannot START_SYNC")
 		return
 	}
-	c := make(chan *message, 10) // buffer up to 10 events
-	d.syncChannel = c
 	if err := d.impl.StartSync(d.syncEvent, d.errorEvent); err != nil {
 		d.outputChan <- messageError("start_sync", "Cannot START_SYNC: "+err.Error())
-		close(d.syncChannel) // do not leak channel...
-		d.syncChannel = nil
 		return
 	}
 	d.syncStarted = true
 	d.outputChan <- messageOk("start_sync")
-
-	go func() {
-		for e := range c {
-			d.outputChan <- e
-		}
-	}()
 }
 
 func (d *DiscoveryServer) stop() {
@@ -275,22 +264,20 @@ func (d *DiscoveryServer) stop() {
 	}
 	d.started = false
 	if d.syncStarted {
-		close(d.syncChannel)
-		d.syncChannel = nil
 		d.syncStarted = false
 	}
 	d.outputChan <- messageOk("stop")
 }
 
 func (d *DiscoveryServer) syncEvent(event string, port *Port) {
-	d.syncChannel <- &message{
+	d.outputChan <- &message{
 		EventType: event,
 		Port:      port,
 	}
 }
 
 func (d *DiscoveryServer) errorEvent(msg string) {
-	d.syncChannel <- messageError("start_sync", msg)
+	d.outputChan <- messageError("start_sync", msg)
 }
 
 func (d *DiscoveryServer) outputProcessor(outWriter io.Writer) {
