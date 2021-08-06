@@ -28,7 +28,8 @@ var Tag = "snapshot"
 // Timestamp is the current timestamp
 var Timestamp = "unknown"
 
-func ParseArgs() {
+// Parse arguments passed by the user
+func Parse() {
 	for _, arg := range os.Args[1:] {
 		if arg == "" {
 			continue
