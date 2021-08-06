@@ -28,35 +28,49 @@ import (
 	"github.com/arduino/pluggable-discovery-protocol-handler/dummy-discovery/args"
 )
 
-type DummyDiscovery struct {
+// dummyDiscovery is an example implementation of a Discovery.
+// It simulates a real implementation of a Discovery by generating
+// connected ports deterministically, it can also be used for testing
+// purposes.
+type dummyDiscovery struct {
 	startSyncCount int
 	closeChan      chan<- bool
 }
 
 func main() {
-	args.ParseArgs()
-	dummyDiscovery := &DummyDiscovery{}
-	server := discovery.NewDiscoveryServer(dummyDiscovery)
+	args.Parse()
+	dummy := &dummyDiscovery{}
+	server := discovery.NewServer(dummy)
 	if err := server.Run(os.Stdin, os.Stdout); err != nil {
 		os.Exit(1)
 	}
 }
 
-func (d *DummyDiscovery) Hello(userAgent string, protocol int) error {
+// Hello does nothing.
+// In a real implementation it could setup background processes
+// or other kind of resources necessary to discover Ports.
+func (d *dummyDiscovery) Hello(userAgent string, protocol int) error {
 	return nil
 }
 
-func (d *DummyDiscovery) Quit() {}
+// Quit does nothing.
+// In a real implementation it can be used to tear down resources
+// used to discovery Ports.
+func (d *dummyDiscovery) Quit() {}
 
-func (d *DummyDiscovery) Stop() error {
+// Stop is used to stop the goroutine started by StartSync
+// used to discover ports.
+func (d *dummyDiscovery) Stop() error {
 	if d.closeChan != nil {
 		d.closeChan <- true
+		close(d.closeChan)
 		d.closeChan = nil
 	}
 	return nil
 }
 
-func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback, errorCB discovery.ErrorCallback) error {
+// StartSync starts the goroutine that generates fake Ports.
+func (d *dummyDiscovery) StartSync(eventCB discovery.EventCallback, errorCB discovery.ErrorCallback) error {
 	d.startSyncCount++
 	if d.startSyncCount%5 == 0 {
 		return errors.New("could not start_sync every 5 times")
@@ -70,8 +84,8 @@ func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback, errorCB disc
 		var closeChan <-chan bool = c
 
 		// Output initial port state
-		eventCB("add", CreateDummyPort())
-		eventCB("add", CreateDummyPort())
+		eventCB("add", createDummyPort())
+		eventCB("add", createDummyPort())
 
 		// Start sending events
 		count := 0
@@ -84,7 +98,7 @@ func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback, errorCB disc
 			case <-time.After(2 * time.Second):
 			}
 
-			port := CreateDummyPort()
+			port := createDummyPort()
 			eventCB("add", port)
 
 			select {
@@ -108,7 +122,8 @@ func (d *DummyDiscovery) StartSync(eventCB discovery.EventCallback, errorCB disc
 
 var dummyCounter = 0
 
-func CreateDummyPort() *discovery.Port {
+// createDummyPort creates a Port with fake data
+func createDummyPort() *discovery.Port {
 	dummyCounter++
 	return &discovery.Port{
 		Address:       fmt.Sprintf("%d", dummyCounter),

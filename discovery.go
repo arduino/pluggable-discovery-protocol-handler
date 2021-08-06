@@ -15,7 +15,7 @@
 // a commercial license, send an email to license@arduino.cc.
 //
 
-// discovery is a library for handling the Arduino Pluggable-Discovery protocol
+// Package discovery is a library for handling the Arduino Pluggable-Discovery protocol
 // (https://github.com/arduino/tooling-rfcs/blob/main/RFCs/0002-pluggable-discovery.md#pluggable-discovery-api-via-stdinstdout)
 //
 // The library implements the state machine and the parsing logic to communicate with a pluggable-discovery client.
@@ -81,9 +81,9 @@ type EventCallback func(event string, port *Port)
 // performs a STOP+START_SYNC cycle.
 type ErrorCallback func(err string)
 
-// A DiscoveryServer is a pluggable discovery protocol handler,
-// it must be created using the NewDiscoveryServer function.
-type DiscoveryServer struct {
+// A Server is a pluggable discovery protocol handler,
+// it must be created using the NewServer function.
+type Server struct {
 	impl               Discovery
 	outputChan         chan *message
 	userAgent          string
@@ -95,11 +95,11 @@ type DiscoveryServer struct {
 	cachedErr          string
 }
 
-// NewDiscoveryServer creates a new discovery server backed by the
+// NewServer creates a new discovery server backed by the
 // provided pluggable discovery implementation. To start the server
 // use the Run method.
-func NewDiscoveryServer(impl Discovery) *DiscoveryServer {
-	return &DiscoveryServer{
+func NewServer(impl Discovery) *Server {
+	return &Server{
 		impl:       impl,
 		outputChan: make(chan *message),
 	}
@@ -110,7 +110,7 @@ func NewDiscoveryServer(impl Discovery) *DiscoveryServer {
 // The function blocks until the `QUIT` command is received or
 // the input stream is closed. In case of IO error the error is
 // returned.
-func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
+func (d *Server) Run(in io.Reader, out io.Writer) error {
 	go d.outputProcessor(out)
 	defer close(d.outputChan)
 	reader := bufio.NewReader(in)
@@ -150,7 +150,7 @@ func (d *DiscoveryServer) Run(in io.Reader, out io.Writer) error {
 	}
 }
 
-func (d *DiscoveryServer) hello(cmd string) {
+func (d *Server) hello(cmd string) {
 	if d.initialized {
 		d.outputChan <- messageError("hello", "HELLO already called")
 		return
@@ -162,12 +162,12 @@ func (d *DiscoveryServer) hello(cmd string) {
 		return
 	}
 	d.userAgent = matches[2]
-	if v, err := strconv.ParseInt(matches[1], 10, 64); err != nil {
+	v, err := strconv.ParseInt(matches[1], 10, 64)
+	if err != nil {
 		d.outputChan <- messageError("hello", "Invalid protocol version: "+matches[2])
 		return
-	} else {
-		d.reqProtocolVersion = int(v)
 	}
+	d.reqProtocolVersion = int(v)
 	if err := d.impl.Hello(d.userAgent, 1); err != nil {
 		d.outputChan <- messageError("hello", err.Error())
 		return
@@ -180,7 +180,7 @@ func (d *DiscoveryServer) hello(cmd string) {
 	d.initialized = true
 }
 
-func (d *DiscoveryServer) start() {
+func (d *Server) start() {
 	if d.started {
 		d.outputChan <- messageError("start", "Discovery already STARTed")
 		return
@@ -199,7 +199,7 @@ func (d *DiscoveryServer) start() {
 	d.outputChan <- messageOk("start")
 }
 
-func (d *DiscoveryServer) eventCallback(event string, port *Port) {
+func (d *Server) eventCallback(event string, port *Port) {
 	id := port.Address + "|" + port.Protocol
 	if event == "add" {
 		d.cachedPorts[id] = port
@@ -209,11 +209,11 @@ func (d *DiscoveryServer) eventCallback(event string, port *Port) {
 	}
 }
 
-func (d *DiscoveryServer) errorCallback(msg string) {
+func (d *Server) errorCallback(msg string) {
 	d.cachedErr = msg
 }
 
-func (d *DiscoveryServer) list() {
+func (d *Server) list() {
 	if !d.started {
 		d.outputChan <- messageError("list", "Discovery not STARTed")
 		return
@@ -236,7 +236,7 @@ func (d *DiscoveryServer) list() {
 	}
 }
 
-func (d *DiscoveryServer) startSync() {
+func (d *Server) startSync() {
 	if d.syncStarted {
 		d.outputChan <- messageError("start_sync", "Discovery already START_SYNCed")
 		return
@@ -253,7 +253,7 @@ func (d *DiscoveryServer) startSync() {
 	d.outputChan <- messageOk("start_sync")
 }
 
-func (d *DiscoveryServer) stop() {
+func (d *Server) stop() {
 	if !d.syncStarted && !d.started {
 		d.outputChan <- messageError("stop", "Discovery already STOPped")
 		return
@@ -269,18 +269,18 @@ func (d *DiscoveryServer) stop() {
 	d.outputChan <- messageOk("stop")
 }
 
-func (d *DiscoveryServer) syncEvent(event string, port *Port) {
+func (d *Server) syncEvent(event string, port *Port) {
 	d.outputChan <- &message{
 		EventType: event,
 		Port:      port,
 	}
 }
 
-func (d *DiscoveryServer) errorEvent(msg string) {
+func (d *Server) errorEvent(msg string) {
 	d.outputChan <- messageError("start_sync", msg)
 }
 
-func (d *DiscoveryServer) outputProcessor(outWriter io.Writer) {
+func (d *Server) outputProcessor(outWriter io.Writer) {
 	// Start go routine to serialize messages printing
 	go func() {
 		for msg := range d.outputChan {
