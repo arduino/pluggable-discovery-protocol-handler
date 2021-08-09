@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/arduino/go-properties-orderedmap"
-	discovery "github.com/arduino/pluggable-discovery-protocol-handler"
-	"github.com/arduino/pluggable-discovery-protocol-handler/dummy-discovery/args"
+	discovery "github.com/arduino/pluggable-discovery-protocol-handler/v2"
+	"github.com/arduino/pluggable-discovery-protocol-handler/v2/dummy-discovery/args"
 )
 
 // dummyDiscovery is an example implementation of a Discovery.
