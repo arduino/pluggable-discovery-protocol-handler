@@ -1,5 +1,9 @@
 # Pluggable Discovery Protocol Handler
 
+<!-- NOTE: update the pkg.go.dev badge URL on each major release -->
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/arduino/pluggable-discovery-protocol-handler.svg)](https://pkg.go.dev/github.com/arduino/pluggable-discovery-protocol-handler/v2)
+
 This project is a library to ease implementation of pluggable discoveries for the [Arduino CLI](https://github.com/arduino/arduino-cli)
 following the [official specification](https://arduino.github.io/arduino-cli/latest/platform-specification/#pluggable-discovery).
 
