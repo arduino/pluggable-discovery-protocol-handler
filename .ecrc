@@ -1,6 +1,7 @@
 {
   "Exclude": [
     "LICENSE.txt",
-    "poetry.lock"
+    "poetry.lock",
+    "^\\.licenses/"
   ]
 }
