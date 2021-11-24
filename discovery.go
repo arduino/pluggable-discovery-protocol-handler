@@ -34,6 +34,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/arduino/go-properties-orderedmap"
 )
@@ -86,6 +87,7 @@ type ErrorCallback func(err string)
 type Server struct {
 	impl               Discovery
 	outputChan         chan *message
+	outputWaiter       sync.WaitGroup
 	userAgent          string
 	reqProtocolVersion int
 	initialized        bool
@@ -111,8 +113,7 @@ func NewServer(impl Discovery) *Server {
 // the input stream is closed. In case of IO error the error is
 // returned.
 func (d *Server) Run(in io.Reader, out io.Writer) error {
-	go d.outputProcessor(out)
-	defer close(d.outputChan)
+	d.startOutputProcessor(out)
 	reader := bufio.NewReader(in)
 	for {
 		fullCmd, err := reader.ReadString('\n')
@@ -141,8 +142,7 @@ func (d *Server) Run(in io.Reader, out io.Writer) error {
 		case "STOP":
 			d.stop()
 		case "QUIT":
-			d.impl.Quit()
-			d.outputChan <- messageOk("quit")
+			d.quit()
 			return nil
 		default:
 			d.outputChan <- messageError("command_error", fmt.Sprintf("Command %s not supported", cmd))
@@ -276,12 +276,26 @@ func (d *Server) syncEvent(event string, port *Port) {
 	}
 }
 
+func (d *Server) quit() {
+	d.impl.Quit()
+	d.outputChan <- messageOk("quit")
+	close(d.outputChan)
+	// If we don't wait for all messages
+	// to be consumed by the output processor
+	// we risk not printing the "quit" message.
+	// This may cause issues to consumers of
+	// the discovery since they expect a message
+	// that is never sent.
+	d.outputWaiter.Wait()
+}
+
 func (d *Server) errorEvent(msg string) {
 	d.outputChan <- messageError("start_sync", msg)
 }
 
-func (d *Server) outputProcessor(outWriter io.Writer) {
+func (d *Server) startOutputProcessor(outWriter io.Writer) {
 	// Start go routine to serialize messages printing
+	d.outputWaiter.Add(1)
 	go func() {
 		for msg := range d.outputChan {
 			data, err := json.MarshalIndent(msg, "", "  ")
@@ -292,5 +306,8 @@ func (d *Server) outputProcessor(outWriter io.Writer) {
 			}
 			fmt.Fprintln(outWriter, string(data))
 		}
+		// We finished consuming all messages, now
+		// we can exit for real
+		d.outputWaiter.Done()
 	}()
 }
