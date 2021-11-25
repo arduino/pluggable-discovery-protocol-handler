@@ -3,6 +3,8 @@
 <!-- NOTE: update the pkg.go.dev badge URL on each major release -->
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/arduino/pluggable-discovery-protocol-handler.svg)](https://pkg.go.dev/github.com/arduino/pluggable-discovery-protocol-handler/v2)
+[![Test Go status](https://github.com/arduino/pluggable-discovery-protocol-handler/actions/workflows/test-go-task.yml/badge.svg)](https://github.com/arduino/pluggable-discovery-protocol-handler/actions/workflows/test-go-task.yml)
+[![Codecov](https://codecov.io/gh/arduino/pluggable-discovery-protocol-handler/branch/main/graph/badge.svg)](https://codecov.io/gh/arduino/pluggable-discovery-protocol-handler)
 
 This project is a library to ease implementation of pluggable discoveries for the [Arduino CLI](https://github.com/arduino/arduino-cli)
 following the [official specification](https://arduino.github.io/arduino-cli/latest/platform-specification/#pluggable-discovery).
