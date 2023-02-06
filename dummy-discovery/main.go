@@ -125,15 +125,17 @@ var dummyCounter = 0
 // createDummyPort creates a Port with fake data
 func createDummyPort() *discovery.Port {
 	dummyCounter++
+	mac := fmt.Sprintf("%d", dummyCounter*384782)
 	return &discovery.Port{
 		Address:       fmt.Sprintf("%d", dummyCounter),
 		AddressLabel:  "Dummy upload port",
 		Protocol:      "dummy",
 		ProtocolLabel: "Dummy protocol",
+		HardwareID:    mac,
 		Properties: properties.NewFromHashmap(map[string]string{
 			"vid": "0x2341",
 			"pid": "0x0041",
-			"mac": fmt.Sprintf("%d", dummyCounter*384782),
+			"mac": mac,
 		}),
 	}
 }

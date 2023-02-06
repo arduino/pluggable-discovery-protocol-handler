@@ -46,6 +46,7 @@ type Port struct {
 	Protocol      string          `json:"protocol,omitempty"`
 	ProtocolLabel string          `json:"protocolLabel,omitempty"`
 	Properties    *properties.Map `json:"properties,omitempty"`
+	HardwareID    string          `json:"hardwareId,omitempty"`
 }
 
 // Discovery is an interface that represents the business logic that
