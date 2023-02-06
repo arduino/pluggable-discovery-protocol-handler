@@ -98,4 +98,5 @@ jobs:
         with:
           file: ${{ matrix.module.path }}coverage_unit.txt
           flags: ${{ matrix.module.codecov-flags }}
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: ${{ github.repository == 'arduino/pluggable-discovery-protocol-handler' }}
