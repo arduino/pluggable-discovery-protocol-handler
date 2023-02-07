@@ -1,7 +1,7 @@
 //
-// This file is part of dummy-discovery.
+// This file is part of pluggable-discovery-protocol-handler.
 //
-// Copyright 2021 ARDUINO SA (http://www.arduino.cc/)
+// Copyright 2022 ARDUINO SA (http://www.arduino.cc/)
 //
 // This software is released under the GNU General Public License version 3,
 // which covers the main part of arduino-cli.
@@ -24,21 +24,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func runDummyDiscovery(t *testing.T) *executils.Process {
-	discoveryDir := "dummy-discovery"
-	// Build dummy-discovery for testing
-	builder, err := executils.NewProcess("go", "build")
+func TestDisc(t *testing.T) {
+	builder, err := executils.NewProcess(nil, "go", "build")
 	require.NoError(t, err)
-	builder.SetDir(discoveryDir)
+	builder.SetDir("dummy-discovery")
 	require.NoError(t, builder.Run())
-	discovery, err := executils.NewProcess("./dummy-discovery")
-	require.NoError(t, err)
-	discovery.SetDir(discoveryDir)
-	return discovery
-}
 
-func TestDiscoveryStdioHandling(t *testing.T) {
-	discovery := runDummyDiscovery(t)
+	discovery, err := executils.NewProcess(nil, "./dummy-discovery")
+	require.NoError(t, err)
+	discovery.SetDir("dummy-discovery")
 
 	stdout, err := discovery.StdoutPipe()
 	require.NoError(t, err)
@@ -46,17 +40,14 @@ func TestDiscoveryStdioHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, discovery.Start())
-	defer discovery.Kill()
 
 	n, err := stdin.Write([]byte("quit\n"))
-	require.Greater(t, n, 0)
 	require.NoError(t, err)
+	require.Greater(t, n, 0)
 	output := [1024]byte{}
-	// require.NoError(t, discovery.Wait())
 	n, err = stdout.Read(output[:])
 	require.Greater(t, n, 0)
 	require.NoError(t, err)
 
-	expectedOutput := "{\n  \"eventType\": \"quit\",\n  \"message\": \"OK\"\n}\n"
-	require.Equal(t, expectedOutput, string(output[:n]))
+	require.Equal(t, "{\n  \"eventType\": \"quit\",\n  \"message\": \"OK\"\n}\n", string(output[:n]))
 }
