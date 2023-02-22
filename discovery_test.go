@@ -41,13 +41,29 @@ func TestDisc(t *testing.T) {
 
 	require.NoError(t, discovery.Start())
 
-	n, err := stdin.Write([]byte("quit\n"))
-	require.NoError(t, err)
-	require.Greater(t, n, 0)
-	output := [1024]byte{}
-	n, err = stdout.Read(output[:])
-	require.Greater(t, n, 0)
-	require.NoError(t, err)
+	{
+		// Check that discovery is able to handle an "hello" without parameters gracefully
+		// https://github.com/arduino/pluggable-discovery-protocol-handler/issues/32
+		inN, err := stdin.Write([]byte("hello\n"))
+		require.NoError(t, err)
+		require.Greater(t, inN, 0)
 
-	require.Equal(t, "{\n  \"eventType\": \"quit\",\n  \"message\": \"OK\"\n}\n", string(output[:n]))
+		output := [1024]byte{}
+		outN, err := stdout.Read(output[:])
+		require.Greater(t, outN, 0)
+		require.NoError(t, err)
+		require.Equal(t, "{\n  \"eventType\": \"hello\",\n  \"message\": \"Invalid HELLO command\",\n  \"error\": true\n}\n", string(output[:outN]))
+	}
+
+	{
+		inN, err := stdin.Write([]byte("quit\n"))
+		require.NoError(t, err)
+		require.Greater(t, inN, 0)
+
+		output := [1024]byte{}
+		outN, err := stdout.Read(output[:])
+		require.Greater(t, outN, 0)
+		require.NoError(t, err)
+		require.Equal(t, "{\n  \"eventType\": \"quit\",\n  \"message\": \"OK\"\n}\n", string(output[:outN]))
+	}
 }
