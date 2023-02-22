@@ -132,7 +132,11 @@ func (d *Server) Run(in io.Reader, out io.Writer) error {
 
 		switch cmd {
 		case "HELLO":
-			d.hello(fullCmd[6:])
+			if len(fullCmd) < 7 {
+				d.hello("")
+			} else {
+				d.hello(fullCmd[6:])
+			}
 		case "START":
 			d.start()
 		case "LIST":
