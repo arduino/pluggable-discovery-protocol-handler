@@ -20,17 +20,17 @@ package discovery
 import (
 	"testing"
 
-	"github.com/arduino/arduino-cli/executils"
+	"github.com/arduino/go-paths-helper"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDisc(t *testing.T) {
-	builder, err := executils.NewProcess(nil, "go", "build")
+	builder, err := paths.NewProcess(nil, "go", "build")
 	require.NoError(t, err)
 	builder.SetDir("dummy-discovery")
 	require.NoError(t, builder.Run())
 
-	discovery, err := executils.NewProcess(nil, "./dummy-discovery")
+	discovery, err := paths.NewProcess(nil, "./dummy-discovery")
 	require.NoError(t, err)
 	discovery.SetDir("dummy-discovery")
 
