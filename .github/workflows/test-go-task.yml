@@ -92,25 +92,23 @@ jobs:
           GO_MODULE_PATH: ${{ matrix.module.path }}
         run: task go:test
 
-      # A token is used to avoid intermittent spurious job failures caused by rate limiting.
-      - name: Set up Codecov upload token
-        run: |
-          if [[ "${{ github.repository }}" == "arduino/pluggable-discovery-protocol-handler" ]]; then
-            # In order to avoid uploads of data from forks, only use the token for runs in this repo.
-            # Token is intentionally exposed.
-            # See: https://community.codecov.com/t/upload-issues-unable-to-locate-build-via-github-actions-api/3954
-            CODECOV_TOKEN="d2497f03-291d-4e0c-9d31-d94614ed7c16"
-          else
-            # codecov/codecov-action does unauthenticated upload if empty string is passed via the `token` input.
-            CODECOV_TOKEN=""
-          fi
-          echo "CODECOV_TOKEN=$CODECOV_TOKEN" >> "$GITHUB_ENV"
-
       - name: Send unit tests coverage to Codecov
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && github.repository == 'arduino/pluggable-discovery-protocol-handler'
         uses: codecov/codecov-action@v3
         with:
-          token: ${{ env.CODECOV_TOKEN }}
+          # A token is used to avoid intermittent spurious job failures caused by rate limiting.
+          token: d2497f03-291d-4e0c-9d31-d94614ed7c16
           file: ${{ matrix.module.path }}coverage_unit.txt
           flags: ${{ matrix.module.codecov-flags }}
-          fail_ci_if_error: ${{ github.repository == 'arduino/pluggable-discovery-protocol-handler' }}
+          fail_ci_if_error: true
+
+      - name: Send unit tests coverage to Codecov (run from a fork)
+        if: runner.os == 'Linux' && github.repository != 'arduino/pluggable-discovery-protocol-handler'
+        uses: codecov/codecov-action@v3
+        with:
+          # use repository variable CODECOV_TOKEN if running from a fork.
+          # codecov/codecov-action does unauthenticated upload if empty string is passed via the `token` input.
+          token: ${{ vars.CODECOV_TOKEN }}
+          file: ${{ matrix.module.path }}coverage_unit.txt
+          flags: ${{ matrix.module.codecov-flags }}
+          fail_ci_if_error: false
