@@ -93,10 +93,22 @@ jobs:
         run: task go:test
 
       - name: Send unit tests coverage to Codecov
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && github.repository == 'arduino/pluggable-discovery-protocol-handler'
         uses: codecov/codecov-action@v3
         with:
+          # A token is used to avoid intermittent spurious job failures caused by rate limiting.
+          token: d2497f03-291d-4e0c-9d31-d94614ed7c16
           file: ${{ matrix.module.path }}coverage_unit.txt
           flags: ${{ matrix.module.codecov-flags }}
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: ${{ github.repository == 'arduino/pluggable-discovery-protocol-handler' }}
+          fail_ci_if_error: true
+
+      - name: Send unit tests coverage to Codecov (run from a fork)
+        if: runner.os == 'Linux' && github.repository != 'arduino/pluggable-discovery-protocol-handler'
+        uses: codecov/codecov-action@v3
+        with:
+          # use repository variable CODECOV_TOKEN if running from a fork.
+          # codecov/codecov-action does unauthenticated upload if empty string is passed via the `token` input.
+          token: ${{ vars.CODECOV_TOKEN }}
+          file: ${{ matrix.module.path }}coverage_unit.txt
+          flags: ${{ matrix.module.codecov-flags }}
+          fail_ci_if_error: false
