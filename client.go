@@ -96,31 +96,6 @@ func (msg discoveryMessage) String() string {
 	return s
 }
 
-// Equals returns true if the given port has the same address and protocol
-// of the current port.
-func (p *Port) Equals(o *Port) bool {
-	return p.Address == o.Address && p.Protocol == o.Protocol
-}
-
-func (p *Port) String() string {
-	if p == nil {
-		return "none"
-	}
-	return p.Address
-}
-
-// Clone creates a copy of this Port
-func (p *Port) Clone() *Port {
-	if p == nil {
-		return nil
-	}
-	res := *p
-	if p.Properties != nil {
-		res.Properties = p.Properties.Clone()
-	}
-	return &res
-}
-
 // Event is a pluggable discovery event
 type Event struct {
 	Type        string
