@@ -29,17 +29,6 @@ import (
 	"github.com/arduino/go-paths-helper"
 )
 
-// To work correctly a Pluggable Discovery must respect the state machine specified on the documentation:
-// https://arduino.github.io/arduino-cli/latest/pluggable-discovery-specification/#state-machine
-// States a PluggableDiscovery can be in
-const (
-	Alive int = iota
-	Idling
-	Running
-	Syncing
-	Dead
-)
-
 // Client is a tool that detects communication ports to interact
 // with the boards.
 type Client struct {
@@ -54,7 +43,6 @@ type Client struct {
 	// All the following fields are guarded by statusMutex
 	statusMutex           sync.Mutex
 	incomingMessagesError error
-	state                 int
 	eventChan             chan<- *Event
 }
 
@@ -108,7 +96,6 @@ func NewClient(id string, args ...string) *Client {
 	return &Client{
 		id:          id,
 		processArgs: args,
-		state:       Dead,
 		userAgent:   "pluggable-discovery-protocol-handler",
 		logger:      &nullClientLogger{},
 	}
@@ -137,7 +124,6 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 	decoder := json.NewDecoder(in)
 	closeAndReportError := func(err error) {
 		disc.statusMutex.Lock()
-		disc.state = Dead
 		disc.incomingMessagesError = err
 		disc.statusMutex.Unlock()
 		close(outChan)
@@ -149,7 +135,6 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 		if err := decoder.Decode(&msg); errors.Is(err, io.EOF) {
 			// This is fine, we exit gracefully
 			disc.statusMutex.Lock()
-			disc.state = Dead
 			disc.incomingMessagesError = err
 			disc.statusMutex.Unlock()
 			close(outChan)
@@ -183,13 +168,6 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 			outChan <- &msg
 		}
 	}
-}
-
-// State returns the current state of this PluggableDiscovery
-func (disc *Client) State() int {
-	disc.statusMutex.Lock()
-	defer disc.statusMutex.Unlock()
-	return disc.state
 }
 
 func (disc *Client) waitMessage(timeout time.Duration) (*discoveryMessage, error) {
@@ -246,7 +224,6 @@ func (disc *Client) runProcess() error {
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
 	disc.process = proc
-	disc.state = Alive
 	disc.logger.Infof("started discovery %s process", disc.id)
 	return nil
 }
@@ -264,7 +241,6 @@ func (disc *Client) killProcess() error {
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
 	disc.stopSync()
-	disc.state = Dead
 	disc.logger.Infof("killed discovery %s process", disc.id)
 	return nil
 }
@@ -307,7 +283,6 @@ func (disc *Client) Run() (err error) {
 	}
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
-	disc.state = Idling
 	return nil
 }
 
@@ -328,7 +303,6 @@ func (disc *Client) Start() error {
 	}
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
-	disc.state = Running
 	return nil
 }
 
@@ -351,7 +325,6 @@ func (disc *Client) Stop() error {
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
 	disc.stopSync()
-	disc.state = Idling
 	return nil
 }
 
@@ -415,7 +388,6 @@ func (disc *Client) StartSync(size int) (<-chan *Event, error) {
 		return nil, fmt.Errorf("communication out of sync, expected 'OK', received '%s'", msg.Message)
 	}
 
-	disc.state = Syncing
 	// In case there is already an existing event channel in use we close it before creating a new one.
 	disc.stopSync()
 	c := make(chan *Event, size)
