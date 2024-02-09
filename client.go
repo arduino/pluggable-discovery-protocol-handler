@@ -70,16 +70,16 @@ type discoveryMessage struct {
 func (msg discoveryMessage) String() string {
 	s := fmt.Sprintf("type: %s", msg.EventType)
 	if msg.Message != "" {
-		s = fmt.Sprintf("%[1]s, message: %[2]s", s, msg.Message)
+		s += fmt.Sprintf(", message: %s", msg.Message)
 	}
 	if msg.ProtocolVersion != 0 {
-		s = fmt.Sprintf("%[1]s, protocol version: %[2]d", s, msg.ProtocolVersion)
+		s += fmt.Sprintf(", protocol version: %d", msg.ProtocolVersion)
 	}
 	if len(msg.Ports) > 0 {
-		s = fmt.Sprintf("%[1]s, ports: %[2]s", s, msg.Ports)
+		s += fmt.Sprintf(", ports: %s", msg.Ports)
 	}
 	if msg.Port != nil {
-		s = fmt.Sprintf("%[1]s, port: %[2]s", s, msg.Port)
+		s += fmt.Sprintf(", port: %s", msg.Port)
 	}
 	return s
 }
@@ -130,9 +130,9 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 		disc.killProcess()
 		close(outChan)
 		if err != nil {
-			disc.logger.Errorf("stopped discovery %s decode loop: %v", disc, err)
+			disc.logger.Errorf("Stopped decode loop: %v", err)
 		} else {
-			disc.logger.Infof("stopped discovery %s decode loop", disc, err)
+			disc.logger.Infof("Stopped decode loop")
 		}
 	}
 
@@ -146,7 +146,7 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 			closeAndReportError(err)
 			return
 		}
-		disc.logger.Infof("from discovery %s received message %s", disc, msg)
+		disc.logger.Infof("Received message %s", msg)
 		if msg.EventType == "add" {
 			if msg.Port == nil {
 				closeAndReportError(errors.New("invalid 'add' message: missing port"))
@@ -193,7 +193,7 @@ func (disc *Client) waitMessage(timeout time.Duration) (*discoveryMessage, error
 }
 
 func (disc *Client) sendCommand(command string) error {
-	disc.logger.Infof("sending command %s to discovery %s", strings.TrimSpace(command), disc)
+	disc.logger.Infof("Sending command %s", strings.TrimSpace(command))
 	data := []byte(command)
 	for {
 		n, err := disc.outgoingCommandsPipe.Write(data)
@@ -208,7 +208,7 @@ func (disc *Client) sendCommand(command string) error {
 }
 
 func (disc *Client) runProcess() error {
-	disc.logger.Infof("starting discovery %s process", disc)
+	disc.logger.Infof("Starting discovery process")
 	proc, err := paths.NewProcess(nil, disc.processArgs...)
 	if err != nil {
 		return err
@@ -234,7 +234,7 @@ func (disc *Client) runProcess() error {
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
 	disc.process = proc
-	disc.logger.Infof("started discovery %s process", disc)
+	disc.logger.Infof("Discovery process started")
 	return nil
 }
 
@@ -242,17 +242,19 @@ func (disc *Client) killProcess() error {
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
 
-	disc.logger.Infof("killing discovery %s process", disc)
+	disc.logger.Infof("Killing discovery process")
 	if disc.process != nil {
 		if err := disc.process.Kill(); err != nil {
+			disc.logger.Errorf("Killing discovery process: %v", err)
 			return err
 		}
 		if err := disc.process.Wait(); err != nil {
+			disc.logger.Errorf("Waiting discovery process termination: %v", err)
 			return err
 		}
 		disc.process = nil
 	}
-	disc.logger.Infof("killed discovery %s process", disc)
+	disc.logger.Infof("Discovery process killed")
 	return nil
 }
 
@@ -274,7 +276,7 @@ func (disc *Client) Run() (err error) {
 		if err := disc.killProcess(); err != nil {
 			// Log failure to kill the process, ideally that should never happen
 			// but it's best to know it if it does
-			disc.logger.Errorf("Killing discovery %s after unsuccessful start: %s", disc, err)
+			disc.logger.Errorf("Killing discovery after unsuccessful start: %s", err)
 		}
 	}()
 
@@ -351,7 +353,7 @@ func (disc *Client) stopSync() {
 func (disc *Client) Quit() {
 	_ = disc.sendCommand("QUIT\n")
 	if _, err := disc.waitMessage(time.Second * 5); err != nil {
-		disc.logger.Errorf("Quitting discovery %s: %s", disc, err)
+		disc.logger.Errorf("Quitting discovery: %s", err)
 	}
 	disc.stopSync()
 	disc.killProcess()
