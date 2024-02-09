@@ -127,17 +127,18 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 		disc.incomingMessagesError = err
 		disc.statusMutex.Unlock()
 		close(outChan)
-		disc.logger.Errorf("stopped discovery %s decode loop: %v", disc, err)
+		if err != nil {
+			disc.logger.Errorf("stopped discovery %s decode loop: %v", disc, err)
+		} else {
+			disc.logger.Infof("stopped discovery %s decode loop", disc, err)
+		}
 	}
 
 	for {
 		var msg discoveryMessage
 		if err := decoder.Decode(&msg); errors.Is(err, io.EOF) {
-			// This is fine, we exit gracefully
-			disc.statusMutex.Lock()
-			disc.incomingMessagesError = err
-			disc.statusMutex.Unlock()
-			close(outChan)
+			// This is fine :flames: we exit gracefully
+			closeAndReportError(nil)
 			return
 		} else if err != nil {
 			closeAndReportError(err)
