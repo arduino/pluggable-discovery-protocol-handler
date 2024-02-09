@@ -18,9 +18,10 @@
 // Package discovery is a library for handling the Arduino Pluggable-Discovery protocol
 // (https://github.com/arduino/tooling-rfcs/blob/main/RFCs/0002-pluggable-discovery.md#pluggable-discovery-api-via-stdinstdout)
 //
-// The library implements the state machine and the parsing logic to communicate with a pluggable-discovery client.
-// All the commands issued by the client are conveniently translated into function calls, in particular
-// the Discovery interface are the only functions that must be implemented to get a fully working pluggable discovery
+// The library implements the state machine and the parsing logic to implement a pluggable-discovery client and server.
+//
+// While implementing a server, all the commands issued by the client are conveniently translated into function calls, in particular
+// the methods of the Discovery interface are the only functions that must be implemented to get a fully working pluggable discovery
 // using this library.
 //
 // A usage example is provided in the dummy-discovery package.
