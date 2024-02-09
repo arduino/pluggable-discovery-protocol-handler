@@ -126,6 +126,8 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 		disc.statusMutex.Lock()
 		disc.incomingMessagesError = err
 		disc.statusMutex.Unlock()
+		disc.stopSync()
+		disc.killProcess()
 		close(outChan)
 		if err != nil {
 			disc.logger.Errorf("stopped discovery %s decode loop: %v", disc, err)
@@ -169,6 +171,13 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 			outChan <- &msg
 		}
 	}
+}
+
+// Alive returns true if the discovery is running and false otherwise.
+func (disc *Client) Alive() bool {
+	disc.statusMutex.Lock()
+	defer disc.statusMutex.Unlock()
+	return disc.process != nil
 }
 
 func (disc *Client) waitMessage(timeout time.Duration) (*discoveryMessage, error) {
@@ -230,6 +239,9 @@ func (disc *Client) runProcess() error {
 }
 
 func (disc *Client) killProcess() error {
+	disc.statusMutex.Lock()
+	defer disc.statusMutex.Unlock()
+
 	disc.logger.Infof("killing discovery %s process", disc)
 	if disc.process != nil {
 		if err := disc.process.Kill(); err != nil {
@@ -238,10 +250,8 @@ func (disc *Client) killProcess() error {
 		if err := disc.process.Wait(); err != nil {
 			return err
 		}
+		disc.process = nil
 	}
-	disc.statusMutex.Lock()
-	defer disc.statusMutex.Unlock()
-	disc.stopSync()
 	disc.logger.Infof("killed discovery %s process", disc)
 	return nil
 }
