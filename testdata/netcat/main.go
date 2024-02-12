@@ -1,6 +1,6 @@
-// This file is part of arduino-cli.
+// This file is part of pluggable-discovery-protocol-handler.
 //
-// Copyright 2023 ARDUINO SA (http://www.arduino.cc/)
+// Copyright 2024 ARDUINO SA (http://www.arduino.cc/)
 //
 // This software is released under the GNU General Public License version 3,
 // which covers the main part of arduino-cli.
@@ -13,16 +13,34 @@
 // Arduino software without disclosing the source code of your own applications.
 // To purchase a commercial license, send an email to license@arduino.cc.
 
-// Echo stdin to stdout.
+// Proxy stdin/stdout through a TCP socket.
 // This program is used for testing purposes, to make it available on all
-// OS a tool equivalent to UNIX "cat".
+// OS a tool equivalent to UNIX "nc".
 package main
 
 import (
 	"io"
+	"net"
 	"os"
 )
 
 func main() {
-	io.Copy(os.Stdout, os.Stdin)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", os.Args[1])
+	if err != nil {
+		println("ResolveTCPAddr failed:", err.Error())
+		os.Exit(1)
+	}
+
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	if err != nil {
+		println("Dial failed:", err.Error())
+		os.Exit(1)
+	}
+
+	go func() {
+		io.Copy(os.Stdout, conn)
+		os.Exit(0)
+	}()
+	io.Copy(conn, os.Stdin)
+	os.Exit(0)
 }

@@ -18,7 +18,7 @@
 package discovery
 
 import (
-	"io"
+	"net"
 	"testing"
 	"time"
 
@@ -27,25 +27,31 @@ import (
 )
 
 func TestDiscoveryStdioHandling(t *testing.T) {
-	// Build `cat` helper inside testdata/cat
+	// Build `netcat` helper inside testdata/cat
 	builder, err := paths.NewProcess(nil, "go", "build")
 	require.NoError(t, err)
-	builder.SetDir("testdata/cat")
+	builder.SetDir("testdata/netcat")
 	require.NoError(t, builder.Run())
 
-	// Run cat and test if streaming json works as expected
-	disc := NewClient("test", "testdata/cat/cat") // copy stdin to stdout
+	// Run netcat and test if streaming json works as expected
+	listener, err := net.ListenTCP("tcp", nil)
+	require.NoError(t, err)
 
+	disc := NewClient("test", "testdata/netcat/netcat", listener.Addr().String())
 	err = disc.runProcess()
 	require.NoError(t, err)
 
-	_, err = disc.outgoingCommandsPipe.Write([]byte(`{ "eventType":`)) // send partial JSON
+	listener.SetDeadline(time.Now().Add(time.Second))
+	conn, err := listener.Accept()
+	require.NoError(t, err)
+
+	_, err = conn.Write([]byte(`{ "eventType":`)) // send partial JSON
 	require.NoError(t, err)
 	msg, err := disc.waitMessage(time.Millisecond * 100)
 	require.Error(t, err)
 	require.Nil(t, msg)
 
-	_, err = disc.outgoingCommandsPipe.Write([]byte(`"ev1" }{ `)) // complete previous json and start another one
+	_, err = conn.Write([]byte(`"ev1" }{ `)) // complete previous json and start another one
 	require.NoError(t, err)
 
 	msg, err = disc.waitMessage(time.Millisecond * 100)
@@ -57,7 +63,7 @@ func TestDiscoveryStdioHandling(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, msg)
 
-	_, err = disc.outgoingCommandsPipe.Write([]byte(`"eventType":"ev2" }`)) // complete previous json
+	_, err = conn.Write([]byte(`"eventType":"ev2" }`)) // complete previous json
 	require.NoError(t, err)
 
 	msg, err = disc.waitMessage(time.Millisecond * 100)
@@ -67,9 +73,9 @@ func TestDiscoveryStdioHandling(t *testing.T) {
 
 	require.True(t, disc.Alive())
 
-	err = disc.outgoingCommandsPipe.(io.ReadCloser).Close()
+	err = conn.Close()
 	require.NoError(t, err)
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 500)
 
 	require.False(t, disc.Alive())
 }
