@@ -18,6 +18,7 @@
 package discovery
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -25,6 +26,18 @@ import (
 	"github.com/arduino/go-paths-helper"
 	"github.com/stretchr/testify/require"
 )
+
+type testLogger struct{}
+
+func (l *testLogger) Infof(msg string, args ...any) {
+	fmt.Printf(msg, args...)
+	fmt.Println()
+}
+
+func (l *testLogger) Errorf(msg string, args ...any) {
+	fmt.Printf(msg, args...)
+	fmt.Println()
+}
 
 func TestDiscoveryStdioHandling(t *testing.T) {
 	// Build `netcat` helper inside testdata/cat
@@ -38,6 +51,7 @@ func TestDiscoveryStdioHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	disc := NewClient("test", "testdata/netcat/netcat", listener.Addr().String())
+	disc.SetLogger(&testLogger{})
 	err = disc.runProcess()
 	require.NoError(t, err)
 
