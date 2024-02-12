@@ -18,9 +18,10 @@
 // Package discovery is a library for handling the Arduino Pluggable-Discovery protocol
 // (https://github.com/arduino/tooling-rfcs/blob/main/RFCs/0002-pluggable-discovery.md#pluggable-discovery-api-via-stdinstdout)
 //
-// The library implements the state machine and the parsing logic to communicate with a pluggable-discovery client.
-// All the commands issued by the client are conveniently translated into function calls, in particular
-// the Discovery interface are the only functions that must be implemented to get a fully working pluggable discovery
+// The library implements the state machine and the parsing logic to implement a pluggable-discovery client and server.
+//
+// While implementing a server, all the commands issued by the client are conveniently translated into function calls, in particular
+// the methods of the Discovery interface are the only functions that must be implemented to get a fully working pluggable discovery
 // using this library.
 //
 // A usage example is provided in the dummy-discovery package.
@@ -35,19 +36,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/arduino/go-properties-orderedmap"
 )
-
-// Port is a descriptor for a board port
-type Port struct {
-	Address       string          `json:"address"`
-	AddressLabel  string          `json:"label,omitempty"`
-	Protocol      string          `json:"protocol,omitempty"`
-	ProtocolLabel string          `json:"protocolLabel,omitempty"`
-	Properties    *properties.Map `json:"properties,omitempty"`
-	HardwareID    string          `json:"hardwareId,omitempty"`
-}
 
 // Discovery is an interface that represents the business logic that
 // a pluggable discovery must implement. The communication protocol
