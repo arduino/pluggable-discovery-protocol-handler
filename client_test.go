@@ -29,7 +29,7 @@ import (
 
 type testLogger struct{}
 
-func (l *testLogger) Infof(msg string, args ...any) {
+func (l *testLogger) Debugf(msg string, args ...any) {
 	fmt.Printf(msg, args...)
 	fmt.Println()
 }

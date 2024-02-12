@@ -49,13 +49,13 @@ type Client struct {
 // ClientLogger is the interface that must be implemented by a logger
 // to be used in the discovery client.
 type ClientLogger interface {
-	Infof(format string, args ...interface{})
+	Debugf(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
 }
 
 type nullClientLogger struct{}
 
-func (l *nullClientLogger) Infof(format string, args ...interface{})  {}
+func (l *nullClientLogger) Debugf(format string, args ...interface{}) {}
 func (l *nullClientLogger) Errorf(format string, args ...interface{}) {}
 
 type discoveryMessage struct {
@@ -132,7 +132,7 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 		if err != nil {
 			disc.logger.Errorf("Stopped decode loop: %v", err)
 		} else {
-			disc.logger.Infof("Stopped decode loop")
+			disc.logger.Debugf("Stopped decode loop")
 		}
 	}
 
@@ -146,7 +146,7 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 			closeAndReportError(err)
 			return
 		}
-		disc.logger.Infof("Received message %s", msg)
+		disc.logger.Debugf("Received message %s", msg)
 		if msg.EventType == "add" {
 			if msg.Port == nil {
 				closeAndReportError(errors.New("invalid 'add' message: missing port"))
@@ -193,7 +193,7 @@ func (disc *Client) waitMessage(timeout time.Duration) (*discoveryMessage, error
 }
 
 func (disc *Client) sendCommand(command string) error {
-	disc.logger.Infof("Sending command %s", strings.TrimSpace(command))
+	disc.logger.Debugf("Sending command %s", strings.TrimSpace(command))
 	data := []byte(command)
 	for {
 		n, err := disc.outgoingCommandsPipe.Write(data)
@@ -208,7 +208,7 @@ func (disc *Client) sendCommand(command string) error {
 }
 
 func (disc *Client) runProcess() error {
-	disc.logger.Infof("Starting discovery process")
+	disc.logger.Debugf("Starting discovery process")
 	proc, err := paths.NewProcess(nil, disc.processArgs...)
 	if err != nil {
 		return err
@@ -234,7 +234,7 @@ func (disc *Client) runProcess() error {
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
 	disc.process = proc
-	disc.logger.Infof("Discovery process started")
+	disc.logger.Debugf("Discovery process started")
 	return nil
 }
 
@@ -242,7 +242,7 @@ func (disc *Client) killProcess() {
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
 
-	disc.logger.Infof("Killing discovery process")
+	disc.logger.Debugf("Killing discovery process")
 	if process := disc.process; process != nil {
 		disc.process = nil
 		if err := process.Kill(); err != nil {
@@ -252,7 +252,7 @@ func (disc *Client) killProcess() {
 			disc.logger.Errorf("Waiting discovery process termination: %v", err)
 		}
 	}
-	disc.logger.Infof("Discovery process killed")
+	disc.logger.Debugf("Discovery process killed")
 }
 
 // Run starts the discovery executable process and sends the HELLO command to the discovery to agree on the
