@@ -238,24 +238,21 @@ func (disc *Client) runProcess() error {
 	return nil
 }
 
-func (disc *Client) killProcess() error {
+func (disc *Client) killProcess() {
 	disc.statusMutex.Lock()
 	defer disc.statusMutex.Unlock()
 
 	disc.logger.Infof("Killing discovery process")
-	if disc.process != nil {
-		if err := disc.process.Kill(); err != nil {
-			disc.logger.Errorf("Killing discovery process: %v", err)
-			return err
-		}
-		if err := disc.process.Wait(); err != nil {
-			disc.logger.Errorf("Waiting discovery process termination: %v", err)
-			return err
-		}
+	if process := disc.process; process != nil {
 		disc.process = nil
+		if err := process.Kill(); err != nil {
+			disc.logger.Errorf("Killing discovery process: %v", err)
+		}
+		if err := process.Wait(); err != nil {
+			disc.logger.Errorf("Waiting discovery process termination: %v", err)
+		}
 	}
 	disc.logger.Infof("Discovery process killed")
-	return nil
 }
 
 // Run starts the discovery executable process and sends the HELLO command to the discovery to agree on the
@@ -273,11 +270,7 @@ func (disc *Client) Run() (err error) {
 		if err == nil {
 			return
 		}
-		if err := disc.killProcess(); err != nil {
-			// Log failure to kill the process, ideally that should never happen
-			// but it's best to know it if it does
-			disc.logger.Errorf("Killing discovery after unsuccessful start: %s", err)
-		}
+		disc.killProcess()
 	}()
 
 	if err = disc.sendCommand("HELLO 1 \"arduino-cli " + disc.userAgent + "\"\n"); err != nil {
