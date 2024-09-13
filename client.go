@@ -287,8 +287,6 @@ func (disc *Client) Run() (err error) {
 	} else if msg.ProtocolVersion > 1 {
 		return fmt.Errorf("protocol version not supported: requested 1, got %d", msg.ProtocolVersion)
 	}
-	disc.statusMutex.Lock()
-	defer disc.statusMutex.Unlock()
 	return nil
 }
 
@@ -307,8 +305,6 @@ func (disc *Client) Start() error {
 	} else if strings.ToUpper(msg.Message) != "OK" {
 		return fmt.Errorf("communication out of sync, expected 'OK', received '%s'", msg.Message)
 	}
-	disc.statusMutex.Lock()
-	defer disc.statusMutex.Unlock()
 	return nil
 }
 
