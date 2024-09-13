@@ -138,11 +138,7 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 
 	for {
 		var msg discoveryMessage
-		if err := decoder.Decode(&msg); errors.Is(err, io.EOF) {
-			// This is fine :flames: we exit gracefully
-			closeAndReportError(nil)
-			return
-		} else if err != nil {
+		if err := decoder.Decode(&msg); err != nil {
 			closeAndReportError(err)
 			return
 		}
@@ -184,7 +180,10 @@ func (disc *Client) waitMessage(timeout time.Duration) (*discoveryMessage, error
 	select {
 	case msg := <-disc.incomingMessagesChan:
 		if msg == nil {
-			return nil, disc.incomingMessagesError
+			disc.statusMutex.Lock()
+			err := disc.incomingMessagesError
+			disc.statusMutex.Unlock()
+			return nil, err
 		}
 		return msg, nil
 	case <-time.After(timeout):
