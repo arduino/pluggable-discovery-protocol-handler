@@ -19,6 +19,7 @@ package discovery
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -92,4 +93,59 @@ func TestDiscoveryStdioHandling(t *testing.T) {
 	time.Sleep(time.Millisecond * 500)
 
 	require.False(t, disc.Alive())
+}
+
+func TestClient(t *testing.T) {
+	// Build dummy-discovery
+	builder, err := paths.NewProcess(nil, "go", "build")
+	require.NoError(t, err)
+	builder.SetDir("dummy-discovery")
+	require.NoError(t, builder.Run())
+
+	t.Run("WithDiscoveryCrashingOnStartup", func(t *testing.T) {
+		// Run client with discovery crashing on startup
+		cl := NewClient("1", "dummy-discovery/dummy-discovery", "--invalid")
+		require.ErrorIs(t, cl.Run(), io.EOF)
+	})
+
+	t.Run("WithDiscoveryCrashingWhileSendingCommands", func(t *testing.T) {
+		// Run client with crashing discovery after 1 second
+		cl := NewClient("1", "dummy-discovery/dummy-discovery", "-k")
+		require.NoError(t, cl.Run())
+
+		time.Sleep(time.Second)
+
+		ch, err := cl.StartSync(20)
+		require.Error(t, err)
+		require.Nil(t, ch)
+	})
+
+	t.Run("WithDiscoveryCrashingWhileStreamingEvents", func(t *testing.T) {
+		// Run client with crashing discovery after 1 second
+		cl := NewClient("1", "dummy-discovery/dummy-discovery", "-k")
+		require.NoError(t, cl.Run())
+
+		ch, err := cl.StartSync(20)
+		require.NoError(t, err)
+
+		time.Sleep(time.Second)
+
+	loop:
+		for {
+			select {
+			case msg, ok := <-ch:
+				if !ok {
+					// Channel closed: Test passed
+					fmt.Println("Event channel closed")
+					break loop
+				}
+				fmt.Println("Recv: ", msg)
+			case <-time.After(time.Second):
+				t.Error("Crashing client did not close event channel")
+				break loop
+			}
+		}
+
+		cl.Quit()
+	})
 }
