@@ -125,9 +125,9 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 	closeAndReportError := func(err error) {
 		disc.statusMutex.Lock()
 		disc.incomingMessagesError = err
-		disc.statusMutex.Unlock()
 		disc.stopSync()
 		disc.killProcess()
+		disc.statusMutex.Unlock()
 		close(outChan)
 		if err != nil {
 			disc.logger.Errorf("Stopped decode loop: %v", err)
@@ -238,9 +238,6 @@ func (disc *Client) runProcess() error {
 }
 
 func (disc *Client) killProcess() {
-	disc.statusMutex.Lock()
-	defer disc.statusMutex.Unlock()
-
 	disc.logger.Debugf("Killing discovery process")
 	if process := disc.process; process != nil {
 		disc.process = nil
@@ -269,7 +266,9 @@ func (disc *Client) Run() (err error) {
 		if err == nil {
 			return
 		}
+		disc.statusMutex.Lock()
 		disc.killProcess()
+		disc.statusMutex.Unlock()
 	}()
 
 	if err = disc.sendCommand("HELLO 1 \"arduino-cli " + disc.userAgent + "\"\n"); err != nil {
@@ -343,8 +342,10 @@ func (disc *Client) Quit() {
 	if _, err := disc.waitMessage(time.Second * 5); err != nil {
 		disc.logger.Errorf("Quitting discovery: %s", err)
 	}
+	disc.statusMutex.Lock()
 	disc.stopSync()
 	disc.killProcess()
+	disc.statusMutex.Unlock()
 }
 
 // List executes an enumeration of the ports and returns a list of the available
@@ -372,9 +373,6 @@ func (disc *Client) List() ([]*Port, error) {
 // The event channel must be consumed as quickly as possible since it may block the
 // discovery if it becomes full. The channel size is configurable.
 func (disc *Client) StartSync(size int) (<-chan *Event, error) {
-	disc.statusMutex.Lock()
-	defer disc.statusMutex.Unlock()
-
 	if err := disc.sendCommand("START_SYNC\n"); err != nil {
 		return nil, err
 	}
@@ -390,6 +388,8 @@ func (disc *Client) StartSync(size int) (<-chan *Event, error) {
 	}
 
 	// In case there is already an existing event channel in use we close it before creating a new one.
+	disc.statusMutex.Lock()
+	defer disc.statusMutex.Unlock()
 	disc.stopSync()
 	c := make(chan *Event, size)
 	disc.eventChan = c
