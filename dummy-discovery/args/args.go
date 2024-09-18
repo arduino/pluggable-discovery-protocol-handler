@@ -20,6 +20,7 @@ package args
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 // Tag is the current git tag
@@ -37,6 +38,14 @@ func Parse() {
 		if arg == "-v" || arg == "--version" {
 			fmt.Printf("dummy-discovery %s (build timestamp: %s)\n", Tag, Timestamp)
 			os.Exit(0)
+		}
+		if arg == "-k" {
+			// Emulate crashing discovery
+			go func() {
+				time.Sleep(time.Millisecond * 500)
+				os.Exit(1)
+			}()
+			continue
 		}
 		fmt.Fprintf(os.Stderr, "invalid argument: %s\n", arg)
 		os.Exit(1)
