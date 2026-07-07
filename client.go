@@ -372,7 +372,34 @@ func (disc *Client) List() ([]*Port, error) {
 // It also creates a channel used to receive events from the pluggable discovery.
 // The event channel must be consumed as quickly as possible since it may block the
 // discovery if it becomes full. The channel size is configurable.
-func (disc *Client) StartSync(size int) (<-chan *Event, error) {
+func (disc *Client) StartSync(size int) (eventChan <-chan *Event, retErr error) {
+	// Create the event channel *before* sending START_SYNC.
+	//
+	// A discovery may emit its initial "add" events as soon as it processes the
+	// START_SYNC command, and those events can reach the client's decode loop
+	// before the "start_sync" success reply does (the discovery emits events from
+	// a separate goroutine, so the "add" and the "start_sync OK" reply race on the
+	// wire). If the event channel is still nil when such an "add" is decoded,
+	// jsonDecodeLoop silently drops it (see the eventChan nil checks there), and
+	// the port is lost until the next re-sync. Creating the channel up-front
+	// guarantees these initial events are delivered.
+	disc.statusMutex.Lock()
+	disc.stopSync()
+	c := make(chan *Event, size)
+	disc.eventChan = c
+	disc.statusMutex.Unlock()
+
+	// If START_SYNC does not complete successfully, tear down the event channel we
+	// just created so we don't leave a dangling channel that jsonDecodeLoop would
+	// keep feeding.
+	defer func() {
+		if retErr != nil {
+			disc.statusMutex.Lock()
+			disc.stopSync()
+			disc.statusMutex.Unlock()
+		}
+	}()
+
 	if err := disc.sendCommand("START_SYNC\n"); err != nil {
 		return nil, err
 	}
@@ -387,11 +414,5 @@ func (disc *Client) StartSync(size int) (<-chan *Event, error) {
 		return nil, fmt.Errorf("communication out of sync, expected 'OK', received '%s'", msg.Message)
 	}
 
-	// In case there is already an existing event channel in use we close it before creating a new one.
-	disc.statusMutex.Lock()
-	defer disc.statusMutex.Unlock()
-	disc.stopSync()
-	c := make(chan *Event, size)
-	disc.eventChan = c
 	return c, nil
 }
