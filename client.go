@@ -376,10 +376,10 @@ func (disc *Client) List() ([]*Port, error) {
 func (disc *Client) StartSync(size int) (eventChan <-chan *Event, retErr error) {
 	// Create the event channel *before* sending START_SYNC.
 	//
-	// A discovery may emit its initial "add" events as soon as it processes the
+	// A discovery may emit its initial "add" events very quickly after receiving the
 	// START_SYNC command, and those events can reach the client's decode loop
-	// before the "start_sync" success reply does (the discovery emits events from
-	// a separate goroutine, so the "add" and the "start_sync OK" reply race on the
+	// before disc.waitMessage returns (the discovery emits events from
+	// a separate goroutine, so the "start_sync OK" and the "add" reply race on the
 	// wire). If the event channel is still nil when such an "add" is decoded,
 	// jsonDecodeLoop silently drops it (see the eventChan nil checks there), and
 	// the port is lost until the next re-sync. Creating the channel up-front

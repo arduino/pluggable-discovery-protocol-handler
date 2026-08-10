@@ -154,11 +154,10 @@ func TestClient(t *testing.T) {
 
 func TestStartSyncDoesNotDropInitialEvents(t *testing.T) {
 	// Regression test: a discovery may emit its initial "add" event as soon as it
-	// receives START_SYNC, and that event can reach the client before the
-	// "start_sync" success reply. The client must not drop such an event.
+	// receives START_SYNC. The client must not drop such an event.
 	//
 	// The netcat helper connects the client's stdio to this test's TCP socket, so
-	// we can inject the racy ordering (add before start_sync OK) deterministically.
+	// we can inject the fast response deterministically.
 	builder, err := paths.NewProcess(nil, "go", "build")
 	require.NoError(t, err)
 	builder.SetDir("testdata/netcat")
@@ -198,10 +197,9 @@ func TestStartSyncDoesNotDropInitialEvents(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "START_SYNC", strings.TrimSpace(line))
 
-	// Emit the initial "add" event *before* the "start_sync" success reply.
-	_, err = conn.Write([]byte(`{"eventType":"add","port":{"address":"/dev/ttyTEST","protocol":"serial"}}` + "\n"))
-	require.NoError(t, err)
-	_, err = conn.Write([]byte(`{"eventType":"start_sync","message":"OK"}` + "\n"))
+	// Emit the initial "add" very quickly after the START_SYNC response,
+	// simulating a very fast discovery. The client must not drop this event.
+	_, err = conn.Write([]byte(`{"eventType":"start_sync","message":"OK"}` + "\n" + `{"eventType":"add","port":{"address":"/dev/ttyTEST","protocol":"serial"}}` + "\n"))
 	require.NoError(t, err)
 
 	// StartSync must complete successfully.
