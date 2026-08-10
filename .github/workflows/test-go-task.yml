@@ -1,17 +1,15 @@
 # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/test-go-task.md
 name: Test Go
 
-env:
-  # See: https://github.com/actions/setup-go/tree/main#supported-version-syntax
-  GO_VERSION: "1.21"
-
-# See: https://docs.github.com/en/free-pro-team@latest/actions/reference/events-that-trigger-workflows
+# See: https://docs.github.com/actions/reference/workflows-and-actions/events-that-trigger-workflows
 on:
   create:
   push:
     paths:
       - ".github/workflows/test-go-task.ya?ml"
-      - "codecov.ya?ml"
+      - ".github/.?codecov.ya?ml"
+      - "dev/.?codecov.ya?ml"
+      - ".?codecov.ya?ml"
       - "**/go.mod"
       - "**/go.sum"
       - "Taskfile.ya?ml"
@@ -20,12 +18,17 @@ on:
   pull_request:
     paths:
       - ".github/workflows/test-go-task.ya?ml"
-      - "codecov.ya?ml"
+      - ".github/.?codecov.ya?ml"
+      - "dev/.?codecov.ya?ml"
+      - ".?codecov.ya?ml"
       - "**/go.mod"
       - "**/go.sum"
       - "Taskfile.ya?ml"
       - "**.go"
       - "**/testdata/**"
+  schedule:
+    # Run periodically to catch breakage caused by external changes.
+    - cron: "0 11 * * WED"
   workflow_dispatch:
   repository_dispatch:
 
@@ -34,15 +37,16 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       result: ${{ steps.determination.outputs.result }}
+    permissions: {}
     steps:
       - name: Determine if the rest of the workflow should run
         id: determination
         run: |
           RELEASE_BRANCH_REGEX="refs/heads/[0-9]+.[0-9]+.x"
           # The `create` event trigger doesn't support `branches` filters, so it's necessary to use Bash instead.
-          if [[ \
-            "${{ github.event_name }}" != "create" || \
-            "${{ github.ref }}" =~ $RELEASE_BRANCH_REGEX \
+          if [[
+            "${{ github.event_name }}" != "create" ||
+            "${{ github.ref }}" =~ $RELEASE_BRANCH_REGEX
           ]]; then
             # Run the other jobs.
             RESULT="true"
@@ -51,12 +55,14 @@ jobs:
             RESULT="false"
           fi
 
-          echo "::set-output name=result::$RESULT"
+          echo "result=$RESULT" >>$GITHUB_OUTPUT
 
   test:
     name: test (${{ matrix.module.path }} - ${{ matrix.operating-system }})
     needs: run-determination
     if: needs.run-determination.outputs.result == 'true'
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: false
@@ -67,7 +73,8 @@ jobs:
           - windows-latest
           - macos-latest
         module:
-          - path: ./
+          # TODO: add paths of all Go modules here
+          - path: .
             codecov-flags: unit
 
     runs-on: ${{ matrix.operating-system }}
@@ -79,36 +86,22 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install Task
-        uses: arduino/setup-task@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          version: 3.x
+          go-version-file: go.mod
 
       - name: Run tests
         env:
           GO_MODULE_PATH: ${{ matrix.module.path }}
-        run: task go:test
+        shell: bash
+        run: |
+          go tool \
+            github.com/go-task/task/v3/cmd/task go:test
 
       - name: Send unit tests coverage to Codecov
-        if: runner.os == 'Linux' && github.repository == 'arduino/pluggable-discovery-protocol-handler'
-        uses: codecov/codecov-action@v4
+        if: runner.os == 'Linux'
+        uses: codecov/codecov-action@v3
         with:
           # A token is used to avoid intermittent spurious job failures caused by rate limiting.
           token: d2497f03-291d-4e0c-9d31-d94614ed7c16
           file: ${{ matrix.module.path }}coverage_unit.txt
           flags: ${{ matrix.module.codecov-flags }}
-          fail_ci_if_error: true
-
-      - name: Send unit tests coverage to Codecov (run from a fork)
-        if: runner.os == 'Linux' && github.repository != 'arduino/pluggable-discovery-protocol-handler'
-        uses: codecov/codecov-action@v4
-        with:
-          # use repository variable CODECOV_TOKEN if running from a fork.
-          # codecov/codecov-action does unauthenticated upload if empty string is passed via the `token` input.
-          token: ${{ vars.CODECOV_TOKEN }}
-          file: ${{ matrix.module.path }}coverage_unit.txt
-          flags: ${{ matrix.module.codecov-flags }}
-          fail_ci_if_error: false
+          fail_ci_if_error: ${{ github.repository == 'arduino/pluggable-discovery-protocol-handler' }}
