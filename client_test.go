@@ -56,7 +56,7 @@ func TestDiscoveryStdioHandling(t *testing.T) {
 	err = disc.runProcess()
 	require.NoError(t, err)
 
-	listener.SetDeadline(time.Now().Add(time.Second))
+	require.NoError(t, listener.SetDeadline(time.Now().Add(time.Second)))
 	conn, err := listener.Accept()
 	require.NoError(t, err)
 
