@@ -15,6 +15,7 @@
 // a commercial license, send an email to license@arduino.cc.
 //
 
+// main is the main module of the dummy-discovery binary. It implements a dummy discovery that can be used for testing purposes.
 package main
 
 import (
@@ -49,7 +50,7 @@ func main() {
 // Hello does nothing.
 // In a real implementation it could setup background processes
 // or other kind of resources necessary to discover Ports.
-func (d *dummyDiscovery) Hello(userAgent string, protocol int) error {
+func (d *dummyDiscovery) Hello(_ string, _ int) error {
 	return nil
 }
 

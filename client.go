@@ -49,14 +49,14 @@ type Client struct {
 // ClientLogger is the interface that must be implemented by a logger
 // to be used in the discovery client.
 type ClientLogger interface {
-	Debugf(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
+	Debugf(format string, args ...any)
+	Errorf(format string, args ...any)
 }
 
 type nullClientLogger struct{}
 
-func (l *nullClientLogger) Debugf(format string, args ...interface{}) {}
-func (l *nullClientLogger) Errorf(format string, args ...interface{}) {}
+func (l *nullClientLogger) Debugf(_ string, _ ...any) {}
+func (l *nullClientLogger) Errorf(_ string, _ ...any) {}
 
 type discoveryMessage struct {
 	EventType       string  `json:"eventType"`
@@ -143,7 +143,8 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 			return
 		}
 		disc.logger.Debugf("Received message %s", msg)
-		if msg.EventType == "add" {
+		switch msg.EventType {
+		case "add":
 			if msg.Port == nil {
 				closeAndReportError(errors.New("invalid 'add' message: missing port"))
 				return
@@ -153,7 +154,7 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 				disc.eventChan <- &Event{"add", msg.Port, disc.GetID()}
 			}
 			disc.statusMutex.Unlock()
-		} else if msg.EventType == "remove" {
+		case "remove":
 			if msg.Port == nil {
 				closeAndReportError(errors.New("invalid 'remove' message: missing port"))
 				return
@@ -163,7 +164,7 @@ func (disc *Client) jsonDecodeLoop(in io.Reader, outChan chan<- *discoveryMessag
 				disc.eventChan <- &Event{"remove", msg.Port, disc.GetID()}
 			}
 			disc.statusMutex.Unlock()
-		} else {
+		default:
 			outChan <- &msg
 		}
 	}
@@ -354,15 +355,15 @@ func (disc *Client) List() ([]*Port, error) {
 	if err := disc.sendCommand("LIST\n"); err != nil {
 		return nil, err
 	}
-	if msg, err := disc.waitMessage(time.Second * 10); err != nil {
+	msg, err := disc.waitMessage(time.Second * 10)
+	if err != nil {
 		return nil, fmt.Errorf("calling LIST: %w", err)
 	} else if msg.EventType != "list" {
 		return nil, fmt.Errorf("event out of sync, expected 'list', received '%s'", msg.EventType)
 	} else if msg.Error {
 		return nil, fmt.Errorf("command failed: %s", msg.Message)
-	} else {
-		return msg.Ports, nil
 	}
+	return msg.Ports, nil
 }
 
 // StartSync puts the discovery in "events" mode: the discovery will send "add"

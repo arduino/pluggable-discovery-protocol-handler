@@ -1,15 +1,25 @@
-# Source: https://github.com/arduino/tooling-project-assets/blob/master/workflow-templates/check-workflows-task.md
+# Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/check-workflows-task.md
 name: Check Workflows
 
-# See: https://docs.github.com/en/actions/reference/events-that-trigger-workflows
+# See: https://docs.github.com/actions/reference/workflows-and-actions/events-that-trigger-workflows
 on:
   push:
     paths:
       - ".github/workflows/*.ya?ml"
+      - ".npmrc"
+      - "go.mod"
+      - "go.sum"
+      - "package.json"
+      - "package-lock.json"
       - "Taskfile.ya?ml"
   pull_request:
     paths:
       - ".github/workflows/*.ya?ml"
+      - ".npmrc"
+      - "go.mod"
+      - "go.sum"
+      - "package.json"
+      - "package-lock.json"
       - "Taskfile.ya?ml"
   schedule:
     # Run every Tuesday at 8 AM UTC to catch breakage resulting from changes to the JSON schema.
@@ -20,16 +30,26 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Task
-        uses: arduino/setup-task@v3
+      - name: Install Go
+        uses: actions/setup-go@v7
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          version: 3.x
+          go-version-file: go.mod
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
 
       - name: Validate workflows
-        run: task --silent ci:validate
+        run: |
+          go tool \
+            github.com/go-task/task/v3/cmd/task \
+              --silent \
+              ci:validate

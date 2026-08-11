@@ -34,4 +34,6 @@ jobs:
           version: 3.x
 
       - name: Spell check
-        run: task general:check-spelling
+        run: |
+          go tool \
+            github.com/go-task/task/v3/cmd/task general:check-spelling

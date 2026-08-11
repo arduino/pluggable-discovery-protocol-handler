@@ -9,12 +9,19 @@ vars:
   DUMMY_DISCOVERY_LDFLAGS: >
     -X github.com/arduino/pluggable-discovery-protocol-handler/dummy-discovery/args.Tag={{.DUMMY_DISCOVERY_VERSION}}
     -X github.com/arduino/pluggable-discovery-protocol-handler/dummy-discovery/args.Timestamp={{.DUMMY_DISCOVERY_TIMESTAMP}}
+  # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/go-task/Taskfile.yml
   # Path of the project's primary Go module:
-  DEFAULT_GO_MODULE_PATH: ./
+  DEFAULT_GO_MODULE_PATH: .
   DEFAULT_GO_PACKAGES:
     sh: |
-      echo $(cd {{default .DEFAULT_GO_MODULE_PATH .GO_MODULE_PATH}} && go list ./... | tr '\n' ' ' || echo '"ERROR: Unable to discover Go packages"')
-  # `-ldflags` flag to use for `go test` command
+      echo $(
+        cd {{default .DEFAULT_GO_MODULE_PATH .GO_MODULE_PATH}} &&
+        go list ./... | tr '\n' ' ' ||
+        echo '"ERROR: Unable to discover Go packages"'
+      )
+  # `-ldflags` flag to use for `go build` command
+  # TODO: define flag if required by the project, or leave empty if not needed.
+  LDFLAGS:
   TEST_LDFLAGS:
 
 tasks:
@@ -27,7 +34,11 @@ tasks:
 
   # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/test-go-task/Taskfile.yml
   go:test:
-    desc: Run unit tests
+    desc: |
+      Run unit tests.
+      Environment variable parameters:
+      - GO_MODULE_PATH: Path of the Go module root (default: {{.DEFAULT_GO_MODULE_PATH}}).
+      - GO_PACKAGES: List of Go packages to test (default: all packages of the module).
     dir: "{{default .DEFAULT_GO_MODULE_PATH .GO_MODULE_PATH}}"
     cmds:
       - |
@@ -40,6 +51,17 @@ tasks:
           {{.TEST_LDFLAGS}} \
           {{default .DEFAULT_GO_PACKAGES .GO_PACKAGES}}
 
+  # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/npm-task/Taskfile.yml
+  npm:install-deps:
+    desc: |
+      Install dependencies managed by npm.
+      Environment variable parameters:
+      - PROJECT_PATH: Path of the npm-managed project (default: {{.DEFAULT_NPM_PROJECT_PATH}}).
+    run: when_changed
+    dir: "{{default .DEFAULT_NPM_PROJECT_PATH .PROJECT_PATH}}"
+    cmds:
+      - npm install
+
   # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/check-workflows-task/Taskfile.yml
   ci:validate:
     desc: Validate GitHub Actions workflows against their JSON schema
@@ -47,8 +69,15 @@ tasks:
       # Source: https://github.com/SchemaStore/schemastore/blob/master/src/schemas/json/github-workflow.json
       WORKFLOW_SCHEMA_URL: https://json.schemastore.org/github-workflow
       WORKFLOW_SCHEMA_PATH:
-        sh: mktemp -t workflow-schema-XXXXXXXXXX.json
+        sh: |
+          go tool \
+            github.com/go-task/task/v3/cmd/task utility:mktemp-file \
+              TEMPLATE="workflow-schema-XXXXXXXXXX.json"
       WORKFLOWS_DATA_PATH: "./.github/workflows/*.{yml,yaml}"
+    deps:
+      - task: npm:install-deps
+        vars:
+          PROJECT_PATH: .
     cmds:
       - |
         wget \
@@ -66,17 +95,28 @@ tasks:
             -s "{{.WORKFLOW_SCHEMA_PATH}}" \
             -d "{{.WORKFLOWS_DATA_PATH}}"
 
+  # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/check-go-dependencies-task/Taskfile.yml
+  general:prepare-deps:
+    desc: Prepare project dependencies for license check
+    # No preparation is needed for Go module-based projects.
+
   # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/check-dependencies-task/Taskfile.yml
   general:cache-dep-licenses:
     desc: Cache dependency license metadata
+    deps:
+      - task: general:prepare-deps
     cmds:
       - |
-        if ! which licensed &>/dev/null; then
-          if [[ "{{OS}}" == "windows" ]]; then
+        if
+          ! which licensed \
+          &>/dev/null
+        then
+          if [[ {{OS}} == "windows" ]]; then
             echo "Licensed does not have Windows support."
             echo "Please use Linux/macOS or download the dependencies cache from the GitHub Actions workflow artifact."
           else
-            echo "licensed not found or not in PATH. Please install: https://github.com/github/licensed#as-an-executable"
+            echo "licensed not found or not in PATH."
+            echo "Please install: https://github.com/licensee/licensed#installation"
           fi
           exit 1
         fi
@@ -88,6 +128,27 @@ tasks:
     deps:
       - task: general:cache-dep-licenses
     cmds:
+      - |
+        MATCHES="$(
+          find \
+            .licenses \
+            -regex '.+\.yml' \
+            -type f \
+            -print0 \
+          | \
+            xargs \
+              --null \
+              go tool \
+                github.com/mikefarah/yq/v4 \
+                  'select(.license == "other") | filename'
+        )"
+        if [[ "$MATCHES" != "" ]]; then
+          printf "%s" "$MATCHES"
+          echo
+          echo "The license cache files above have the license set to 'other'. Please manually define the license type and retry."
+          echo "See: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/check-go-dependencies-task.md#unrecognized-licenses"
+          exit 1
+        fi
       - licensed status
 
   # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/check-general-formatting-task/Taskfile.yml
@@ -95,8 +156,12 @@ tasks:
     desc: Check basic formatting style of all files
     cmds:
       - |
-        if ! which ec &>/dev/null; then
-          echo "ec not found or not in PATH. Please install: https://github.com/editorconfig-checker/editorconfig-checker#installation"
+        if
+          ! which ec \
+          &>/dev/null
+        then
+          echo "ec not found or not in PATH."
+          echo "Please install: https://github.com/editorconfig-checker/editorconfig-checker#installation"
           exit 1
         fi
       - ec
@@ -144,26 +209,76 @@ tasks:
 
   # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/check-go-task/Taskfile.yml
   go:fix:
-    desc: Modernize usages of outdated APIs
+    desc: |
+      Modernize usages of outdated APIs.
+      Environment variable parameters:
+      - GO_MODULE_PATH: Path of the Go module root (default: {{.DEFAULT_GO_MODULE_PATH}}).
+      - GO_PACKAGES: List of Go packages to modernize (default: all packages of the module).
+    dir: "{{default .DEFAULT_GO_MODULE_PATH .GO_MODULE_PATH}}"
     cmds:
       - go fix {{default .DEFAULT_GO_PACKAGES .GO_PACKAGES}}
 
   # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/check-go-task/Taskfile.yml
-  go:lint:
-    desc: Lint Go code
-    cmds:
-      - |
-        if ! which golint &>/dev/null; then
-          echo "golint not installed or not in PATH. Please install: https://github.com/golang/lint#installation"
-          exit 1
-        fi
-      - |
-        golint \
-          {{default "-min_confidence 0.8 -set_exit_status" .GO_LINT_FLAGS}} \
-          {{default .DEFAULT_GO_PACKAGES .GO_PACKAGES}}
-
-  # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/check-go-task/Taskfile.yml
   go:format:
-    desc: Format Go code
+    desc: |
+      Format Go code.
+      Environment variable parameters:
+      - GO_MODULE_PATH: Path of the Go module root (default: {{.DEFAULT_GO_MODULE_PATH}}).
+      - GO_PACKAGES: List of Go packages to modernize (default: all packages of the module).
+    dir: "{{default .DEFAULT_GO_MODULE_PATH .GO_MODULE_PATH}}"
     cmds:
       - go fmt {{default .DEFAULT_GO_PACKAGES .GO_PACKAGES}}
+
+  # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/check-go-task/Taskfile.yml
+  go:lint:
+    desc: |
+      Lint Go code
+      Environment variable parameters:
+      - GO_MODULE_PATH: Path of the Go module root (default: {{.DEFAULT_GO_MODULE_PATH}}).
+    dir: "{{default .DEFAULT_GO_MODULE_PATH .GO_MODULE_PATH}}"
+    cmds:
+      - |
+        if
+          ! which golangci-lint \
+          &>/dev/null
+        then
+          echo "golangci-lint not installed or not in PATH."
+          echo "Please install: https://golangci-lint.run/usage/install/#local-installation"
+          exit 1
+        fi
+      - golangci-lint run
+
+  # Make a temporary file and print the path passed to stdout.
+  # Environment variable parameters:
+  # - TEMPLATE: template for the format of the filename.
+  # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/windows-task/Taskfile.yml
+  utility:mktemp-file:
+    vars:
+      RAW_PATH:
+        sh: mktemp --tmpdir "{{.TEMPLATE}}"
+    cmds:
+      - task: utility:normalize-path
+        vars:
+          RAW_PATH: "{{.RAW_PATH}}"
+
+  # Print a normalized version of the path to stdout.
+  # Environment variable parameters:
+  # - RAW_PATH: the path to be normalized.
+  # Source: https://github.com/arduino/tooling-project-assets/blob/main/workflow-templates/assets/windows-task/Taskfile.yml
+  utility:normalize-path:
+    cmds:
+      - |
+        if
+          [[ "{{.OS}}" == "Windows_NT" ]] \
+          && \
+          which cygpath \
+          &>/dev/null
+        then
+          # Even though the shell handles POSIX format absolute paths as expected, external applications do not.
+          # So paths passed to such applications must first be converted to Windows format.
+          cygpath \
+            -w \
+            "{{.RAW_PATH}}"
+        else
+          echo "{{.RAW_PATH}}"
+        fi

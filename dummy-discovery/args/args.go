@@ -15,6 +15,7 @@
 // a commercial license, send an email to license@arduino.cc.
 //
 
+// Package args contains arguments parsing subroutines for the dummy-discovery binary.
 package args
 
 import (
