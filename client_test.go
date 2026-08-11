@@ -165,17 +165,17 @@ func TestStartSyncDoesNotDropInitialEvents(t *testing.T) {
 
 	listener, err := net.ListenTCP("tcp", nil)
 	require.NoError(t, err)
-	defer listener.Close()
+	t.Cleanup(func() { _ = listener.Close() })
 
 	disc := NewClient("test", "testdata/netcat/netcat", listener.Addr().String())
 	disc.SetLogger(&testLogger{})
 	require.NoError(t, disc.runProcess())
-	defer disc.Quit()
+	t.Cleanup(disc.Quit)
 
-	listener.SetDeadline(time.Now().Add(5 * time.Second))
+	require.NoError(t, listener.SetDeadline(time.Now().Add(5*time.Second)))
 	conn, err := listener.Accept()
 	require.NoError(t, err)
-	defer conn.Close()
+	t.Cleanup(func() { _ = conn.Close() })
 
 	// StartSync sends START_SYNC and blocks until it receives the reply, so run it
 	// in the background and collect its result.
