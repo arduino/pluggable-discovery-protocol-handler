@@ -18,9 +18,11 @@
 package discovery
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -148,4 +150,76 @@ func TestClient(t *testing.T) {
 
 		cl.Quit()
 	})
+}
+
+func TestStartSyncDoesNotDropInitialEvents(t *testing.T) {
+	// Regression test: a discovery may emit its initial "add" event as soon as it
+	// receives START_SYNC. The client must not drop such an event.
+	//
+	// The netcat helper connects the client's stdio to this test's TCP socket, so
+	// we can inject the fast response deterministically.
+	builder, err := paths.NewProcess(nil, "go", "build")
+	require.NoError(t, err)
+	builder.SetDir("testdata/netcat")
+	require.NoError(t, builder.Run())
+
+	listener, err := net.ListenTCP("tcp", nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close() })
+
+	disc := NewClient("test", "testdata/netcat/netcat", listener.Addr().String())
+	disc.SetLogger(&testLogger{})
+	require.NoError(t, disc.runProcess())
+	t.Cleanup(disc.Quit)
+
+	require.NoError(t, listener.SetDeadline(time.Now().Add(5*time.Second)))
+	conn, err := listener.Accept()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	// StartSync sends START_SYNC and blocks until it receives the reply, so run it
+	// in the background and collect its result.
+	type startSyncResult struct {
+		ch  <-chan *Event
+		err error
+	}
+	resultCh := make(chan startSyncResult, 1)
+	go func() {
+		ch, err := disc.StartSync(10)
+		resultCh <- startSyncResult{ch, err}
+	}()
+
+	// Wait for the START_SYNC command to be sent, mirroring a real discovery that
+	// only emits events after being told to sync. At this point a correct client
+	// must already be ready to receive events.
+	connReader := bufio.NewReader(conn)
+	line, err := connReader.ReadString('\n')
+	require.NoError(t, err)
+	require.Equal(t, "START_SYNC", strings.TrimSpace(line))
+
+	// Emit the initial "add" very quickly after the START_SYNC response,
+	// simulating a very fast discovery. The client must not drop this event.
+	_, err = conn.Write([]byte(`{"eventType":"start_sync","message":"OK"}` + "\n" + `{"eventType":"add","port":{"address":"/dev/ttyTEST","protocol":"serial"}}` + "\n"))
+	require.NoError(t, err)
+
+	// StartSync must complete successfully.
+	var result startSyncResult
+	select {
+	case result = <-resultCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("StartSync did not return")
+	}
+	require.NoError(t, result.err)
+	require.NotNil(t, result.ch)
+
+	// The initial "add" event must be delivered on the channel, not dropped.
+	select {
+	case ev, ok := <-result.ch:
+		require.True(t, ok, "event channel was closed instead of delivering the initial event")
+		require.Equal(t, "add", ev.Type)
+		require.NotNil(t, ev.Port)
+		require.Equal(t, "/dev/ttyTEST", ev.Port.Address)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the initial 'add' event was dropped")
+	}
 }
