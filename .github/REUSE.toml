@@ -1,0 +1,24 @@
+version = 1
+
+# GitHub workflows
+[[annotations]]
+path = [
+  "PULL_REQUEST_TEMPLATE.md",
+  "workflows/build-dummy-discovery.yaml",
+  "workflows/check-general-formatting-task.yml",
+  "workflows/check-go-dependencies-task.yml",
+  "workflows/check-go-task.yml",
+  "workflows/check-reuse-compliance.yml",
+  "workflows/check-taskfiles.yml",
+  "workflows/check-workflows-task.yml",
+  "workflows/release-tag.yml",
+  "workflows/spell-check-task.yml",
+  "workflows/sync-labels.yml",
+  "workflows/test-go-task.yml",
+  "ISSUE_TEMPLATE/bug-report.yml",
+  "ISSUE_TEMPLATE/config.yml",
+  "ISSUE_TEMPLATE/feature-request.yml",
+  "dependabot.yml"
+]
+SPDX-FileCopyrightText = "Arduino s.r.l. and/or its affiliated companies"
+SPDX-License-Identifier = "GPL-3.0-or-later"

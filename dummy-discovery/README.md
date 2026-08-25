@@ -252,14 +252,11 @@ If you think you found a vulnerability or other security-related bug in this pro
 [security policy](https://github.com/arduino/pluggable-discovery-protocol-handler/security/policy) and report the bug to our Security Team 🛡️
 Thank you!
 
-e-mail contact: security@arduino.cc
+e-mail contact: <security@arduino.cc>
 
 ## License
 
-Copyright (c) 2021 ARDUINO SA (www.arduino.cc)
-
-The software is released under the GNU General Public License, which covers the main body
-of the serial-discovery code. The terms of this license can be found at:
-https://www.gnu.org/licenses/gpl-3.0.en.html
-
-See [LICENSE.txt](https://github.com/arduino/pluggable-discovery-protocol-handler/blob/master/LICENSE.txt) for details.
+```txt
+SPDX-FileCopyrightText: Arduino s.r.l. and/or its affiliated companies
+SPDX-License-Identifier: GPL-3.0-or-later
+```
