@@ -1,2 +1,6 @@
+# This file is part of pluggable-discovery-protocol-handler.
+#
+# SPDX-FileCopyrightText: Arduino s.r.l. and/or its affiliated companies
+# SPDX-License-Identifier: GPL-3.0-or-later
 netcat
 netcat.exe

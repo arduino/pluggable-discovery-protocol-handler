@@ -2,6 +2,7 @@
   "Exclude": [
     "^\\.git[/\\\\]",
     "^\\.licenses[/\\\\]",
+    "^LICENSES[/\\\\]",
     "__pycache__[/\\\\]",
     "node_modules[/\\\\]",
     "^LICENSE\\.txt$",
